@@ -43,7 +43,7 @@ namespace TwitchStreamDownloader.Download
         public AccessTokenFields? Access { get; set; }
 
         private readonly HttpClient client;
-        private readonly CancellationTokenSource cancellationTokenSource;
+        private CancellationTokenSource cancellationTokenSource2;
 
         private readonly Random random = new();
 
@@ -88,7 +88,7 @@ namespace TwitchStreamDownloader.Download
             client.DefaultRequestHeaders.Clear();
             client.DefaultRequestHeaders.Add("User-Agent", settings.userAgent);
 
-            cancellationTokenSource = new CancellationTokenSource();
+            cancellationTokenSource2 = new CancellationTokenSource();
         }
 
         /// <exception cref="BadCodeException">Если хттп код не саксес.</exception>
@@ -105,7 +105,7 @@ namespace TwitchStreamDownloader.Download
 
             string playbackHash = "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712";
 
-            Access = await AccessTokenNet.GetAccessToken(client, playbackHash, channel, oauth, clientId, cancellationTokenSource.Token);
+            Access = await AccessTokenNet.GetAccessToken(client, playbackHash, channel, oauth, clientId, cancellationTokenSource2.Token);
         }
 
         /// <exception cref="Exception">Если забыли положить Access</exception>
@@ -116,12 +116,25 @@ namespace TwitchStreamDownloader.Download
 
             var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.token, settings.fastBread, random.Next(9999));
 
-            StartMasterLoop(usherUri);
+            StartMasterLoop(usherUri, cancellationTokenSource2.Token);
         }
 
-        private async void StartMasterLoop(Uri usherUri)
+        /// <summary>
+        /// Остановить круги, но не ломать
+        /// </summary>
+        public void Stop()
         {
-            while (!Disposed)
+            cancellationTokenSource2.Cancel();
+
+            cancellationTokenSource2 = new();
+
+            LastMediaTime = null;
+            LastMediaSequenceNumber = -1;
+        }
+
+        private async void StartMasterLoop(Uri usherUri, CancellationToken cancellationToken)
+        {
+            while (!Disposed && !cancellationToken.IsCancellationRequested)
             {
                 try
                 {
@@ -130,8 +143,8 @@ namespace TwitchStreamDownloader.Download
                     {
                         requestMessage.Headers.Add("Accept", "application/x-mpegURL, application/vnd.apple.mpegurl, application/json, text/plain");
 
-                        using var response = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationTokenSource.Token);
-                        responseContent = await response.Content.ReadAsStringAsync(cancellationTokenSource.Token);
+                        using var response = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationToken);
+                        responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
 
                         if (response.StatusCode != HttpStatusCode.OK)
                         {
@@ -154,11 +167,11 @@ namespace TwitchStreamDownloader.Download
 
                     try
                     {
-                        await StartMediaLoop(playlist);
+                        await StartMediaLoop(playlist, cancellationToken);
                         //если не вылет, значит закончился
                         OnPlaylistEnded();
                     }
-                    catch (TaskCanceledException) when (Disposed)
+                    catch (TaskCanceledException) when (Disposed || cancellationToken.IsCancellationRequested)
                     {
                         return;
                     }
@@ -167,7 +180,7 @@ namespace TwitchStreamDownloader.Download
                         OnMediaPlaylistException(e);
                     }
                 }
-                catch (TaskCanceledException) when (Disposed)
+                catch (TaskCanceledException) when (Disposed || cancellationToken.IsCancellationRequested)
                 {
                     return;
                 }
@@ -178,13 +191,13 @@ namespace TwitchStreamDownloader.Download
 
                 try
                 {
-                    await Task.Delay(settings.masterPlaylistRetryDelay, cancellationTokenSource.Token);
+                    await Task.Delay(settings.masterPlaylistRetryDelay, cancellationToken);
                 }
                 catch { return; }
             }
         }
 
-        private async Task StartMediaLoop(MasterPlaylist masterPlaylist)
+        private async Task StartMediaLoop(MasterPlaylist masterPlaylist, CancellationToken cancellationToken)
         {
             VariantStream? variantStream = null;
 
@@ -227,13 +240,13 @@ namespace TwitchStreamDownloader.Download
             OnMediaQualitySelected(variantStream);
             LastVideo = variantStream.streamInfTag.video!;
 
-            while (!Disposed)
+            while (!Disposed && !cancellationToken.IsCancellationRequested)
             {
                 string responseContent;
                 using (var requestMessage = new HttpRequestMessage(HttpMethod.Get, variantStream.uri))
                 {
-                    using HttpResponseMessage responseMessage = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationTokenSource.Token);
-                    responseContent = await responseMessage.Content.ReadAsStringAsync(cancellationTokenSource.Token);
+                    using HttpResponseMessage responseMessage = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationToken);
+                    responseContent = await responseMessage.Content.ReadAsStringAsync(cancellationToken);
 
                     if (responseMessage.StatusCode != HttpStatusCode.OK)
                     {
@@ -275,6 +288,11 @@ namespace TwitchStreamDownloader.Download
                     StreamSegment segmentInfo = new(mediaSegment.uri, mediaSegment.infTag.title!, currentMediaSequenceNumber, mediaSegment.infTag.duration, mediaSegment.programDateTag.time, LastVideo);
 
                     OnSegmentArrived(segmentInfo);
+
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
                 }
 
                 OnMediaPlaylistProcessed();
@@ -294,7 +312,7 @@ namespace TwitchStreamDownloader.Download
                 if (resultDuration < settings.minMediaPlaylistUpdateDelay.TotalMilliseconds)
                     resultDuration = (int)settings.minMediaPlaylistUpdateDelay.TotalMilliseconds;
 
-                await Task.Delay(resultDuration, cancellationTokenSource.Token);
+                await Task.Delay(resultDuration, cancellationToken);
             }
         }
 
@@ -306,7 +324,7 @@ namespace TwitchStreamDownloader.Download
         {
             try
             {
-                using var cancelSus = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokenSource.Token, token);
+                using var cancelSus = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokenSource2.Token, token);
                 using var requestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
                 using var response = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancelSus.Token);
 
@@ -388,10 +406,10 @@ namespace TwitchStreamDownloader.Download
 
             Disposed = true;
 
-            cancellationTokenSource.Cancel();
+            cancellationTokenSource2.Cancel();
 
             client.Dispose();
-            cancellationTokenSource.Dispose();
+            cancellationTokenSource2.Dispose();
 
             GC.SuppressFinalize(this);
         }
