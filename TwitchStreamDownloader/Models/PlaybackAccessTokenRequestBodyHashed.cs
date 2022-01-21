@@ -1,6 +1,6 @@
 namespace TwitchStreamDownloader.Models
 {
-    class PlaybackAccessTokenRequestBody
+    class PlaybackAccessTokenRequestBodyHashed
     {
         public class Extensions
         {
@@ -46,7 +46,7 @@ namespace TwitchStreamDownloader.Models
         public Extensions extensions;
         public Variables variables;
 
-        public PlaybackAccessTokenRequestBody(string hash, string channel)
+        public PlaybackAccessTokenRequestBodyHashed(string hash, string channel)
         {
             extensions = new Extensions(new Extensions.PersistedQuery(1, hash));
 

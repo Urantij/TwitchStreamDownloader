@@ -41,6 +41,8 @@ namespace TwitchStreamDownloader.Download
         public string? LastVideo { get; private set; } = null;
 
         public AccessTokenFields? Access { get; set; }
+        public string? DeviceId { get; set; }
+        public string? SessionId { get; set; }
 
         private readonly HttpClient client;
         private CancellationTokenSource cancellationTokenSource2;
@@ -95,7 +97,7 @@ namespace TwitchStreamDownloader.Download
         /// <exception cref="WrongContentException">Если содержимое ответа не такое, какое хотелось бы.</exception>
         /// <exception cref="TaskCanceledException">Отменили.</exception>
         /// <exception cref="Exception">Скорее всего, не удалось совершить запрос.</exception>
-        public async Task UpdateAccess(string? clientId, string? oauth)
+        public async Task Update(string? clientId, string? oauth)
         {
             if (clientId == null)
                 clientId = "kimne78kx3ncx6brgo4mv6wki5h1ko";
@@ -103,18 +105,44 @@ namespace TwitchStreamDownloader.Download
             if (oauth == null)
                 oauth = "undefined";
 
-            string playbackHash = "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712";
+            DeviceId = GqlNet.GenerateDeviceId(random);
+            SessionId = UsherNet.GenerateUniqueId(random);
 
-            Access = await AccessTokenNet.GetAccessToken(client, playbackHash, channel, oauth, clientId, cancellationTokenSource2.Token);
+            Access = await GqlNet.GetAccessToken(client, channel, clientId, DeviceId, oauth, cancellationTokenSource2.Token);
         }
 
-        /// <exception cref="Exception">Если забыли положить Access</exception>
+        /// <exception cref="BadCodeException">Если хттп код не саксес.</exception>
+        /// <exception cref="WrongContentException">Если содержимое ответа не такое, какое хотелось бы.</exception>
+        /// <exception cref="TaskCanceledException">Отменили.</exception>
+        /// <exception cref="Exception">Скорее всего, не удалось совершить запрос.</exception>
+        protected async Task UpdateAccessWithHash(string? clientId, string? oauth)
+        {
+            if (clientId == null)
+                clientId = "kimne78kx3ncx6brgo4mv6wki5h1ko";
+
+            if (oauth == null)
+                oauth = "undefined";
+
+            DeviceId = GqlNet.GenerateDeviceId(random);
+
+            string playbackHash = "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712";
+
+            Access = await GqlNet.GetAccessTokenWithHash(client, playbackHash, channel, clientId, DeviceId, oauth, cancellationTokenSource2.Token);
+        }
+
+        /// <exception cref="Exception">Если забыли положить Access, DeviceId или SessionId</exception>
         public void Start()
         {
             if (Access == null)
-                throw new Exception("No AccessFields");
+                throw new Exception("No Access");
 
-            var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.token, settings.fastBread, random.Next(9999));
+            if (DeviceId == null)
+                throw new Exception("No DeviceId");
+
+            if (SessionId == null)
+                throw new Exception("No SessionId");
+
+            var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.token, settings.fastBread, SessionId, random);
 
             StartMasterLoop(usherUri, cancellationTokenSource2.Token);
         }
