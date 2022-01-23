@@ -29,6 +29,9 @@ namespace TwitchStreamDownloader.Download
     {
         public bool Disposed { get; private set; } = false;
 
+        /// <summary>
+        /// програмдейт последнего сегмента
+        /// </summary>
         public DateTimeOffset? LastMediaTime { get; private set; } = null;
         public int LastMediaSequenceNumber { get; private set; } = -1;
 
@@ -40,17 +43,22 @@ namespace TwitchStreamDownloader.Download
 
         public string? LastVideo { get; private set; } = null;
 
-        public AccessTokenFields? Access { get; set; }
-        public string? DeviceId { get; set; }
-        public string? SessionId { get; set; }
+        //Предполагалось, что сюда можно будет руками из кеша положить, но мне стало впадлу.
+        public AccessToken? Access { get; private set; }
+        public string DeviceId { get; private set; }
+        public string SessionId { get; private set; }
 
         private readonly HttpClient client;
-        private CancellationTokenSource cancellationTokenSource2;
+        //Вообще, раз уж качамба отдельно идёт, нужно бы вынести её. Но да ладно
+        private CancellationTokenSource cancellationTokenSourceWeb;
+        private CancellationTokenSource cancellationTokenSourceLoop;
 
         private readonly Random random = new();
 
         private readonly SegmentsDownloaderSettings settings;
         private readonly string channel;
+        private string? clientId;
+        private string? oauth;
 
         public event EventHandler? PlaylistEnded;
         public event EventHandler<Exception>? MasterPlaylistExceptionOccured;
@@ -68,14 +76,26 @@ namespace TwitchStreamDownloader.Download
         public event EventHandler<LineEventArgs>? UnknownPlaylistLineFound;
         public event EventHandler<LineEventArgs>? CommentPlaylistLineFound;
 
+        /// <summary>
+        /// Успешно получили токен
+        /// </summary>
+        public event EventHandler<AccessToken>? TokenAcquired;
+
+        /// <summary>
+        /// Выдало ошибку, когда обновлялся токен сам
+        /// </summary>
+        public event EventHandler<Exception>? TokenAcquiringException;
+
         //дыбажим
         public event Action<MasterPlaylist>? MasterPlaylistDebugHandler;
         public event Action<MediaPlaylist>? MediaPlaylistDebugHandler;
 
-        public SegmentsDownloader(SegmentsDownloaderSettings settings, string channel)
+        public SegmentsDownloader(SegmentsDownloaderSettings settings, string channel, string? clientId, string? oauth)
         {
             this.settings = settings;
             this.channel = channel;
+            this.clientId = clientId;
+            this.oauth = oauth;
 
             var httpHandler = new SocketsHttpHandler()
             {
@@ -85,66 +105,89 @@ namespace TwitchStreamDownloader.Download
 
             client = new HttpClient(httpHandler)
             {
-                Timeout = TimeSpan.FromSeconds(5)
+                Timeout = TimeSpan.FromSeconds(7.5)
             };
             client.DefaultRequestHeaders.Clear();
             client.DefaultRequestHeaders.Add("User-Agent", settings.userAgent);
 
-            cancellationTokenSource2 = new CancellationTokenSource();
-        }
-
-        /// <exception cref="BadCodeException">Если хттп код не саксес.</exception>
-        /// <exception cref="WrongContentException">Если содержимое ответа не такое, какое хотелось бы.</exception>
-        /// <exception cref="TaskCanceledException">Отменили.</exception>
-        /// <exception cref="Exception">Скорее всего, не удалось совершить запрос.</exception>
-        public async Task Update(string? clientId, string? oauth)
-        {
-            if (clientId == null)
-                clientId = "kimne78kx3ncx6brgo4mv6wki5h1ko";
-
-            if (oauth == null)
-                oauth = "undefined";
+            cancellationTokenSourceWeb = new CancellationTokenSource();
+            cancellationTokenSourceLoop = new CancellationTokenSource();
 
             DeviceId = GqlNet.GenerateDeviceId(random);
             SessionId = UsherNet.GenerateUniqueId(random);
+        }
 
-            Access = await GqlNet.GetAccessToken(client, channel, clientId, DeviceId, oauth, cancellationTokenSource2.Token);
+        public void SetCreds(string? clientId, string? oauth)
+        {
+            this.clientId = clientId;
+            this.oauth = oauth;
         }
 
         /// <exception cref="BadCodeException">Если хттп код не саксес.</exception>
         /// <exception cref="WrongContentException">Если содержимое ответа не такое, какое хотелось бы.</exception>
         /// <exception cref="TaskCanceledException">Отменили.</exception>
         /// <exception cref="Exception">Скорее всего, не удалось совершить запрос.</exception>
-        protected async Task UpdateAccessWithHash(string? clientId, string? oauth)
+        public async Task<AccessToken> RequestToken()
         {
-            if (clientId == null)
-                clientId = "kimne78kx3ncx6brgo4mv6wki5h1ko";
+            const string undefined = "undefined";
 
-            if (oauth == null)
-                oauth = "undefined";
+            string requestClientId = clientId ?? "kimne78kx3ncx6brgo4mv6wki5h1ko";
+            string requestOauth = oauth ?? undefined;
 
-            DeviceId = GqlNet.GenerateDeviceId(random);
+            var access = await GqlNet.GetAccessToken(client, channel, requestClientId, DeviceId, requestOauth, cancellationTokenSourceLoop.Token);
 
-            string playbackHash = "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712";
-
-            Access = await GqlNet.GetAccessTokenWithHash(client, playbackHash, channel, clientId, DeviceId, oauth, cancellationTokenSource2.Token);
+            return access;
         }
 
-        /// <exception cref="Exception">Если забыли положить Access, DeviceId или SessionId</exception>
-        public void Start()
+        /// <summary>
+        /// Изо всех сил пытается достать токен. Ошибки не бросает. Ну, хендлеры могут в тевории.
+        /// </summary>
+        /// <returns>нулл, если хуйня отменилась</returns>
+        async Task<AccessToken?> RequestTokenToTheLimit(CancellationToken cancellationToken)
         {
+            AccessToken? token = null;
+
+            while (token == null && !cancellationToken.IsCancellationRequested && !Disposed)
+            {
+                try
+                {
+                    token = await RequestToken();
+                }
+                catch (Exception e)
+                {
+                    TokenAcquiringException?.Invoke(this, e);
+
+                    try { await Task.Delay(settings.accessTokenRetryDelay, cancellationToken); } catch { return null; }
+                }
+            }
+
+            //Тупо, что 2 проверки. Но они дешёвые, а алгоритм получше ещё придумать нужно.
+            if (token == null || cancellationToken.IsCancellationRequested || Disposed)
+                return null;
+
+            TokenAcquired?.Invoke(this, token);
+
+            return token;
+        }
+
+        /// <summary>
+        /// Будет качать пока не остановят
+        /// </summary>
+        public async void Start()
+        {
+            var currentToken = cancellationTokenSourceLoop.Token;
+
             if (Access == null)
-                throw new Exception("No Access");
+            {
+                Access = await RequestTokenToTheLimit(currentToken);
 
-            if (DeviceId == null)
-                throw new Exception("No DeviceId");
+                if (Access == null)
+                    return;
+            }
 
-            if (SessionId == null)
-                throw new Exception("No SessionId");
+            var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.fastBread, SessionId, random);
 
-            var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.token, settings.fastBread, SessionId, random);
-
-            StartMasterLoop(usherUri, cancellationTokenSource2.Token);
+            StartMasterLoop(usherUri, currentToken);
         }
 
         /// <summary>
@@ -152,11 +195,10 @@ namespace TwitchStreamDownloader.Download
         /// </summary>
         public void Stop()
         {
-            cancellationTokenSource2.Cancel();
+            cancellationTokenSourceLoop.Cancel();
+            cancellationTokenSourceLoop = new();
 
-            cancellationTokenSource2 = new();
-
-            LastMediaTime = null;
+            //LastMediaTime = null;
             LastMediaSequenceNumber = -1;
         }
 
@@ -195,7 +237,7 @@ namespace TwitchStreamDownloader.Download
 
                     try
                     {
-                        await StartMediaLoop(playlist, cancellationToken);
+                        await MediaLoop(playlist, cancellationToken);
                         //если не вылет, значит закончился
                         OnPlaylistEnded();
                     }
@@ -212,20 +254,26 @@ namespace TwitchStreamDownloader.Download
                 {
                     return;
                 }
+                catch (BadCodeException bde) when (bde.statusCode == HttpStatusCode.Forbidden && settings.automaticallyUpdateAccessToken)
+                {
+                    OnMasterPlaylistException(bde);
+
+                    Access = await RequestTokenToTheLimit(cancellationToken);
+                    if (Access == null)
+                        return;
+
+                    usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.fastBread, SessionId, random);
+                }
                 catch (Exception e)
                 {
                     OnMasterPlaylistException(e);
-                }
 
-                try
-                {
-                    await Task.Delay(settings.masterPlaylistRetryDelay, cancellationToken);
+                    try { await Task.Delay(settings.masterPlaylistRetryDelay, cancellationToken); } catch { return; }
                 }
-                catch { return; }
             }
         }
 
-        private async Task StartMediaLoop(MasterPlaylist masterPlaylist, CancellationToken cancellationToken)
+        private async Task MediaLoop(MasterPlaylist masterPlaylist, CancellationToken cancellationToken)
         {
             VariantStream? variantStream = null;
 
@@ -327,7 +375,8 @@ namespace TwitchStreamDownloader.Download
 
                 if (mediaPlaylist.endList)
                 {
-                    LastMediaTime = null;
+                    //зачем это обнулять? время же не движется назать блять
+                    //LastMediaTime = null;
                     LastMediaSequenceNumber = -1;
                     return;
                 }
@@ -352,7 +401,7 @@ namespace TwitchStreamDownloader.Download
         {
             try
             {
-                using var cancelSus = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokenSource2.Token, token);
+                using var cancelSus = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokenSourceWeb.Token, token);
                 using var requestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
                 using var response = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancelSus.Token);
 
@@ -382,6 +431,7 @@ namespace TwitchStreamDownloader.Download
             }
         }
 
+        #region Events
         private void OnPlaylistEnded()
         {
             PlaylistEnded?.Invoke(this, EventArgs.Empty);
@@ -427,6 +477,12 @@ namespace TwitchStreamDownloader.Download
             CommentPlaylistLineFound?.Invoke(this, new LineEventArgs(master, line));
         }
 
+        private void OnTokenAcquired(AccessToken accessToken)
+        {
+            TokenAcquired?.Invoke(this, accessToken);
+        }
+        #endregion
+
         public void Dispose()
         {
             if (Disposed)
@@ -434,10 +490,12 @@ namespace TwitchStreamDownloader.Download
 
             Disposed = true;
 
-            cancellationTokenSource2.Cancel();
+            try { cancellationTokenSourceWeb.Cancel(); } catch { }
+            try { cancellationTokenSourceLoop.Cancel(); } catch { }
 
             client.Dispose();
-            cancellationTokenSource2.Dispose();
+            try { cancellationTokenSourceWeb.Dispose(); } catch { }
+            try { cancellationTokenSourceLoop.Dispose(); } catch { }
 
             GC.SuppressFinalize(this);
         }

@@ -7,14 +7,16 @@ using TwitchStreamDownloader.Models;
 
 namespace TwitchStreamDownloader.Net
 {
-    public class AccessTokenFields
+    public class AccessToken
     {
-        public readonly string token;
+        public readonly string value;
+        public readonly AccessTokenValue parsedValue;
         public readonly string signature;
 
-        public AccessTokenFields(string token, string signature)
+        public AccessToken(string value, AccessTokenValue parsedValue, string signature)
         {
-            this.token = token;
+            this.value = value;
+            this.parsedValue = parsedValue;
             this.signature = signature;
         }
     }
@@ -22,45 +24,9 @@ namespace TwitchStreamDownloader.Net
     public static class GqlNet
     {
         /// <exception cref="BadCodeException">Если хттп код не саксес.</exception>
-        /// <exception cref="WrongContentException">Если содержимое ответа не такое, какое хотелось бы.</exception>
-        /// <exception cref="Exception">Скорее всего, не удалось совершить запрос.</exception>
-        internal static async Task<AccessTokenFields> GetAccessTokenWithHash(HttpClient client, string hash, string channel, string clientId, string deviceId, string oauth, CancellationToken cancellationToken)
-        {
-            var requestToken = new PlaybackAccessTokenRequestBodyHashed(hash, channel);
-
-            var requestBody = JsonConvert.SerializeObject(requestToken);
-
-            string? responseContent;
-            using (var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://gql.twitch.tv/gql"))
-            {
-                requestMessage.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
-                FormGqlRequestHeaders(requestMessage.Headers, clientId, deviceId, oauth);
-
-                using var response = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationToken);
-                responseContent = await response.Content.ReadAsStringAsync(CancellationToken.None);
-
-                if (response.StatusCode != HttpStatusCode.OK)
-                {
-                    throw new BadCodeException(response.StatusCode, responseContent);
-                }
-            }
-
-            try
-            {
-                var deserialized = JsonConvert.DeserializeObject<PlaybackAccessTokenResponseBody>(responseContent)!;
-
-                return new AccessTokenFields(deserialized.data.streamPlaybackAccessToken.value, deserialized.data.streamPlaybackAccessToken.signature);
-            }
-            catch (Exception e)
-            {
-                throw new WrongContentException("GetAccessToken", responseContent, e);
-            }
-        }
-
-        /// <exception cref="BadCodeException">Если хттп код не саксес.</exception>
         /// <exception cref="Exception">Скорее всего, не удалось совершить запрос.</exception>
         /// <exception cref="WrongContentException">Если содержимое ответа не такое, какое хотелось бы.</exception>
-        internal static async Task<AccessTokenFields> GetAccessToken(HttpClient client, string channel, string clientId, string deviceId, string oauth, CancellationToken cancellationToken)
+        internal static async Task<AccessToken> GetAccessToken(HttpClient client, string channel, string clientId, string deviceId, string oauth, CancellationToken cancellationToken)
         {
             const string query = @"query(
                 $login: String!
@@ -108,7 +74,10 @@ namespace TwitchStreamDownloader.Net
                 if (parsed == null)
                     throw new Exception("null");
 
-                return new AccessTokenFields(parsed.data.streamPlaybackAccessToken.value, parsed.data.streamPlaybackAccessToken.signature);
+                //не может же выдать нулл
+                var parsedTokenValue = JsonConvert.DeserializeObject<AccessTokenValue>(parsed.data.streamPlaybackAccessToken.value)!;
+
+                return new AccessToken(parsed.data.streamPlaybackAccessToken.value, parsedTokenValue, parsed.data.streamPlaybackAccessToken.signature);
             }
             catch (Exception e)
             {

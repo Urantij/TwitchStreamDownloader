@@ -29,6 +29,16 @@ namespace TwitchStreamDownloader.Download
         public TimeSpan maxMediaPlaylistUpdateDelay = TimeSpan.FromSeconds(3);
 
         /// <summary>
+        /// 1 min default
+        /// </summary>
+        public TimeSpan accessTokenRetryDelay = TimeSpan.FromMinutes(1);
+
+        /// <summary>
+        /// Если мастер лист выдал 403, нужно обновлять токен
+        /// </summary>
+        public bool automaticallyUpdateAccessToken = true;
+
+        /// <summary>
         /// Если поставить тру, всё наёбнётся, наверное.
         /// TODO (именно здесь, ага) если времени нет, не делать предположение вокруг времени, только по намберу. 
         /// Должно сработать, если синхронизировать по времени намберы плейлистов
