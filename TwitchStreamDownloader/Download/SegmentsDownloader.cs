@@ -48,9 +48,12 @@ namespace TwitchStreamDownloader.Download
         public string DeviceId { get; private set; }
         public string SessionId { get; private set; }
 
+        public int TokenAcquiranceFailedAttempts { get; private set; } = 0;
+
         private readonly HttpClient client;
         //Вообще, раз уж качамба отдельно идёт, нужно бы вынести её. Но да ладно
-        private CancellationTokenSource cancellationTokenSourceWeb;
+        //по факту это отмена всего качатора. можно было бы второй токен связать с этим, но там диспозед есть, так что похуй?
+        private readonly CancellationTokenSource cancellationTokenSourceWeb;
         private CancellationTokenSource cancellationTokenSourceLoop;
 
         private readonly Random random = new();
@@ -145,6 +148,12 @@ namespace TwitchStreamDownloader.Download
         /// <returns>нулл, если хуйня отменилась</returns>
         async Task<AccessToken?> RequestTokenToTheLimit(CancellationToken cancellationToken)
         {
+            /* Вообще, счётчик попыток стоило бы сделать локальной хуйнёй?
+             * А выдавать через аргументы события.
+             * Но дезинг вроде такой, что не может быть два ретрая онлайн за раз.
+             * Так что похуй, надеюсь.
+             * Но тогда не нужно в начале обнулять, если ошибок нет :) */
+            TokenAcquiranceFailedAttempts = 0;
             AccessToken? token = null;
 
             while (token == null && !cancellationToken.IsCancellationRequested && !Disposed)
@@ -155,17 +164,36 @@ namespace TwitchStreamDownloader.Download
                 }
                 catch (Exception e)
                 {
+                    TokenAcquiranceFailedAttempts++;
+
                     TokenAcquiringException?.Invoke(this, e);
 
-                    try { await Task.Delay(settings.accessTokenRetryDelay, cancellationToken); } catch { return null; }
+                    bool shortDelay;
+                    if (oauth != null && settings.oauthTokenFailedAttemptsLimit != -1 && TokenAcquiranceFailedAttempts >= settings.oauthTokenFailedAttemptsLimit)
+                    {
+                        SetCreds(null, null);
+
+                        shortDelay = true;
+                    }
+                    else
+                    {
+                        shortDelay = TokenAcquiranceFailedAttempts == 1;
+                    }
+
+                    TimeSpan delay = shortDelay ? settings.shortAccessTokenRetryDelay : settings.accessTokenRetryDelay;
+                    try { await Task.Delay(delay, cancellationToken); } catch { break; }
                 }
             }
 
             //Тупо, что 2 проверки. Но они дешёвые, а алгоритм получше ещё придумать нужно.
             if (token == null || cancellationToken.IsCancellationRequested || Disposed)
+            {
+                TokenAcquiranceFailedAttempts = 0;
                 return null;
+            }
 
             TokenAcquired?.Invoke(this, token);
+            TokenAcquiranceFailedAttempts = 0;
 
             return token;
         }

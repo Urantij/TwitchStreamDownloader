@@ -29,14 +29,26 @@ namespace TwitchStreamDownloader.Download
         public TimeSpan maxMediaPlaylistUpdateDelay = TimeSpan.FromSeconds(3);
 
         /// <summary>
-        /// 1 min default
+        /// Вечно у твича отваливается жопа. Первый ретрай будет ждать меньше.
+        /// Алсо, если токен меняется автомат с oauth на нул, то тоже будет это время
         /// </summary>
-        public TimeSpan accessTokenRetryDelay = TimeSpan.FromMinutes(1);
+        public TimeSpan shortAccessTokenRetryDelay = TimeSpan.FromSeconds(20);
+
+        /// <summary>
+        /// 2 min default
+        /// </summary>
+        public TimeSpan accessTokenRetryDelay = TimeSpan.FromMinutes(2);
 
         /// <summary>
         /// Если мастер лист выдал 403, нужно обновлять токен
         /// </summary>
         public bool automaticallyUpdateAccessToken = true;
+
+        /// <summary>
+        /// Если качатор с oauth токеном, то можно после лимита вылетов подряд попытки скачать токен сбросить oauth в нул.
+        /// По дефолту 3, -1 отключает.
+        /// </summary>
+        public int oauthTokenFailedAttemptsLimit = 3;
 
         /// <summary>
         /// Если поставить тру, всё наёбнётся, наверное.
