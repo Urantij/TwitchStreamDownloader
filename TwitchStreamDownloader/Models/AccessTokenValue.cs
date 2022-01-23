@@ -39,9 +39,8 @@ namespace TwitchStreamDownloader.Models
 
         /// <summary>
         /// DateTimeOffset.FromUnixTimeSeconds
-        /// Не нулл чтобы крашилось, если нет. а так только оно нужно
         /// </summary>
-        public long expires;
+        public long? expires;
 
         public bool? extended_history_allowed;
 
