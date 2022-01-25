@@ -1,3 +1,4 @@
+using System;
 using System.Net;
 using PlaylistParser.Models;
 using PlaylistParser.Parsers;
@@ -70,6 +71,9 @@ namespace TwitchStreamDownloader.Download
         /// Ошибка именно при загрузке контента сегмента
         /// </summary>
         public event EventHandler<Exception>? SegmentDownloadExceptionOccured;
+        /// <summary>
+        /// LastVideo содержит предыдущее качество
+        /// </summary>
         public event EventHandler<VariantStream>? MediaQualitySelected;
         /// <summary>
         /// Сюда прибывают сегменты
@@ -232,10 +236,24 @@ namespace TwitchStreamDownloader.Download
 
         private async void StartMasterLoop(Uri usherUri, CancellationToken cancellationToken)
         {
+            //ну вот мало ли выскочит непонятная ошибка, и ждать плейлист не будет в итоге
+            DateTime? lastMasterPlaylistRequestDate = null;
+
             while (!Disposed && !cancellationToken.IsCancellationRequested)
             {
                 try
                 {
+                    if (lastMasterPlaylistRequestDate != null)
+                    {
+                        var passed = DateTime.UtcNow - lastMasterPlaylistRequestDate.Value;
+
+                        if (passed < settings.masterPlaylistRetryDelay)
+                        {
+                            var toWait = settings.masterPlaylistRetryDelay - passed;
+                            try { await Task.Delay(settings.masterPlaylistRetryDelay, cancellationToken); } catch { return; }
+                        }
+                    }
+
                     string responseContent;
                     using (var requestMessage = new HttpRequestMessage(HttpMethod.Get, usherUri))
                     {
@@ -249,6 +267,7 @@ namespace TwitchStreamDownloader.Download
                             throw new BadCodeException(response.StatusCode, responseContent);
                         }
                     }
+                    lastMasterPlaylistRequestDate = DateTime.UtcNow;
 
                     MasterParser parser = new();
                     parser.UnknownLineFound += (_, line) => OnUnknownPlaylistLine(true, line);
@@ -266,25 +285,35 @@ namespace TwitchStreamDownloader.Download
                     try
                     {
                         await MediaLoop(playlist, cancellationToken);
-                        //если не вылет, значит закончился
-                        OnPlaylistEnded();
                     }
                     catch (TaskCanceledException) when (Disposed || cancellationToken.IsCancellationRequested)
                     {
                         return;
                     }
+                    catch (NoQualityException e)
+                    {
+                        //Вообще на той стороне человечек должен дёрнуть рубильник, но мало ли
+                        OnMediaPlaylistException(e);
+
+                        try { await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken); } catch { return; }
+                        continue;
+                    }
                     catch (Exception e)
                     {
                         OnMediaPlaylistException(e);
+                        continue;
                     }
+
+                    //если не вылет, значит закончился
+                    OnPlaylistEnded();
                 }
                 catch (TaskCanceledException) when (Disposed || cancellationToken.IsCancellationRequested)
                 {
                     return;
                 }
-                catch (BadCodeException bde) when (bde.statusCode == HttpStatusCode.Forbidden && settings.automaticallyUpdateAccessToken)
+                catch (BadCodeException e) when (e.statusCode == HttpStatusCode.Forbidden && settings.automaticallyUpdateAccessToken)
                 {
-                    OnMasterPlaylistException(bde);
+                    OnMasterPlaylistException(e);
 
                     Access = await RequestTokenToTheLimit(cancellationToken);
                     if (Access == null)
@@ -296,6 +325,7 @@ namespace TwitchStreamDownloader.Download
                 {
                     OnMasterPlaylistException(e);
 
+                    //непонятно зачем это теперь, ну да ладно
                     try { await Task.Delay(settings.masterPlaylistRetryDelay, cancellationToken); } catch { return; }
                 }
             }
