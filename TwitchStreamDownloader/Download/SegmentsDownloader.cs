@@ -231,7 +231,7 @@ namespace TwitchStreamDownloader.Download
             cancellationTokenSourceLoop = new();
 
             //LastMediaTime = null;
-            LastMediaSequenceNumber = -1;
+            //LastMediaSequenceNumber = -1; нет же смысла. даже если фастбред включён, первые сегменты дадут время
         }
 
         private async void StartMasterLoop(Uri usherUri, CancellationToken cancellationToken)
@@ -449,6 +449,20 @@ namespace TwitchStreamDownloader.Download
 
                 await Task.Delay(resultDuration, cancellationToken);
             }
+        }
+
+        /// <summary>
+        /// Отказатсья от токена, чтобы загрузчик остановился и попытался получить новый и продолжить.
+        /// По факту ленивый шорткат от Stop Access=null Start
+        /// </summary>
+        public void DropToken()
+        {
+            cancellationTokenSourceLoop.Cancel();
+            cancellationTokenSourceLoop = new();
+
+            Access = null;
+
+            Start();
         }
 
         /// <param name="uri"></param>
