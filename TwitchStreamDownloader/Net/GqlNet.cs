@@ -91,8 +91,10 @@ namespace TwitchStreamDownloader.Net
         {
             var requestBodyObj = new
             {
+#pragma warning disable IDE0037
                 query = query,
                 variables = variables,
+#pragma warning restore IDE0037
             };
 
             var requestBody = JsonConvert.SerializeObject(requestBodyObj);

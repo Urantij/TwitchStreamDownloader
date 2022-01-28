@@ -196,7 +196,7 @@ namespace TwitchStreamDownloader.Download
                 return null;
             }
 
-            TokenAcquired?.Invoke(this, token);
+            OnTokenAcquired(token);
             TokenAcquiranceFailedAttempts = 0;
 
             return token;
