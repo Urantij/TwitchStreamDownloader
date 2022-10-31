@@ -1,4 +1,5 @@
 using TwitchStreamDownloader.Download;
+using TwitchStreamDownloader.Exceptions;
 using TwitchStreamDownloader.Resources;
 
 namespace TwitchStreamDownloader.Queues
@@ -45,6 +46,8 @@ namespace TwitchStreamDownloader.Queues
 
         private readonly object locker = new();
 
+        private readonly TimeSpan downloadTimeout;
+
         /* лайв пришёл раньше очередного, пусть обтекает
          * в теории очередной может вообще не прийти, но блять */
         private readonly List<QueueItem> liveList = new();
@@ -57,9 +60,23 @@ namespace TwitchStreamDownloader.Queues
         /// Когда хуйня скачалась или затаймаутилась. в порядке очереди.
         /// </summary>
         public event EventHandler<QueueItem>? ItemDequeued;
-        public event EventHandler<Exception>? ExceptionOccured;
 
-        public async Task DownloadAsync(StreamSegment segment, SegmentsDownloader downloader, Stream bufferWriteStream, TimeSpan timeout)
+        public DownloadQueue(TimeSpan downloadTimeout)
+        {
+            this.downloadTimeout = downloadTimeout;
+        }
+
+        /// <summary>
+        /// Эта штука кидает ошибки, если чето не загрузится.
+        /// Queue в любом случае нужно будет использовать после.
+        /// Иначе смэрть.
+        /// </summary>
+        /// <param name="httpClient"></param>
+        /// <param name="segment"></param>
+        /// <param name="bufferWriteStream"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception">Куча всего.</exception>
+        public async Task DownloadAsync(HttpClient httpClient, StreamSegment segment, Stream bufferWriteStream)
         {
             TaskCompletionSource taskSource = new();
 
@@ -72,22 +89,27 @@ namespace TwitchStreamDownloader.Queues
             //наверное, если тут уже пошла загрузка, отменять не супер идея, но с другой стороны, хуй знает че там и как
             try
             {
-                using var cancellationSource = new CancellationTokenSource(timeout);
-                item.written = await downloader.TryDownload(segment.uri, bufferWriteStream, cancellationSource.Token);
-            }
-            catch { }
+                using var downloadCts = new CancellationTokenSource(downloadTimeout);
 
-            taskSource.SetResult();
+                await DownloadVideoAsync(httpClient, segment.uri, bufferWriteStream, downloadCts.Token);
+
+                item.written = true;
+                taskSource.SetResult();
+            }
+            catch
+            {
+                taskSource.SetResult();
+                throw;
+            }
         }
 
         /// <summary>
-        /// Когда хуйня скачалась или затаймаутилась. в порядке очереди.
-        /// НЕ СТОИТ ЕЁ await, иначе будешь обрабатывать поток загрузки у себя весь.
+        /// Кладёт в очередь. Использовать после DownloadAsync.
         /// </summary>
         /// <param name="segment"></param>
         /// <returns></returns>
         /// <exception cref="InvalidOperationException">Если сегмента нет в списке. Всегда download должен быть первым, хз</exception>
-        public async Task QueueAsync(StreamSegment segment)
+        public void Queue(StreamSegment segment)
         {
             lock (locker)
             {
@@ -102,6 +124,11 @@ namespace TwitchStreamDownloader.Queues
                 processing = true;
             }
 
+            _ = Task.Run(ProcessingLoopAsync);
+        }
+
+        async void ProcessingLoopAsync()
+        {
             while (!Disposed)
             {
                 QueueItem? item;
@@ -116,21 +143,25 @@ namespace TwitchStreamDownloader.Queues
 
                 await item.downloadOperationTask;
 
-                try
-                {
-                    ItemDequeued?.Invoke(this, item);
-                }
-                catch (Exception e)
-                {
-                    ExceptionOccured?.Invoke(this, e);
-                }
+                ItemDequeued?.Invoke(this, item);
+            }
+        }
+
+        /// <exception cref="TaskCanceledException">Токен отменился.</exception>
+        /// <exception cref="Exception">Куча всего.</exception>
+        async Task DownloadVideoAsync(HttpClient httpClient, Uri uri, Stream writeStream, CancellationToken timeoutCancellationToken)
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+            using var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, timeoutCancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string responseContent = await response.Content.ReadAsStringAsync(CancellationToken.None);
+
+                throw new BadCodeException(response.StatusCode, responseContent);
             }
 
-            //ооочень важно
-            lock (locker)
-            {
-                processing = false;
-            }
+            await response.Content.CopyToAsync(writeStream, timeoutCancellationToken);
         }
 
         public void Dispose()

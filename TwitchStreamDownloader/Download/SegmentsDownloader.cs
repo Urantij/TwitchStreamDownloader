@@ -51,7 +51,7 @@ namespace TwitchStreamDownloader.Download
 
         public int TokenAcquiranceFailedAttempts { get; private set; } = 0;
 
-        private readonly HttpClient client;
+        public readonly HttpClient httpClient;
         //Вообще, раз уж качамба отдельно идёт, нужно бы вынести её. Но да ладно
         //по факту это отмена всего качатора. можно было бы второй токен связать с этим, но там диспозед есть, так что похуй?
         private readonly CancellationTokenSource cancellationTokenSourceWeb;
@@ -67,10 +67,6 @@ namespace TwitchStreamDownloader.Download
         public event EventHandler? PlaylistEnded;
         public event EventHandler<Exception>? MasterPlaylistExceptionOccured;
         public event EventHandler<Exception>? MediaPlaylistExceptionOccured;
-        /// <summary>
-        /// Ошибка именно при загрузке контента сегмента
-        /// </summary>
-        public event EventHandler<Exception>? SegmentDownloadExceptionOccured;
         /// <summary>
         /// LastVideo содержит предыдущее качество
         /// </summary>
@@ -97,25 +93,22 @@ namespace TwitchStreamDownloader.Download
         public event Action<MasterPlaylist>? MasterPlaylistDebugHandler;
         public event Action<MediaPlaylist>? MediaPlaylistDebugHandler;
 
-        public SegmentsDownloader(SegmentsDownloaderSettings settings, string channel, string? clientId, string? oauth)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="httpClient">Не забудь его задиспоузить сам.</param>
+        /// <param name="settings"></param>
+        /// <param name="channel"></param>
+        /// <param name="clientId"></param>
+        /// <param name="oauth"></param>
+        public SegmentsDownloader(HttpClient httpClient, SegmentsDownloaderSettings settings, string channel, string? clientId, string? oauth)
         {
             this.settings = settings;
             this.channel = channel;
             this.clientId = clientId;
             this.oauth = oauth;
 
-            var httpHandler = new SocketsHttpHandler
-            {
-                Proxy = settings.proxy,
-                UseProxy = settings.proxy != null
-            };
-
-            client = new HttpClient(httpHandler)
-            {
-                Timeout = TimeSpan.FromSeconds(7.5)
-            };
-            client.DefaultRequestHeaders.Clear();
-            client.DefaultRequestHeaders.Add("User-Agent", settings.userAgent);
+            this.httpClient = httpClient;
 
             cancellationTokenSourceWeb = new CancellationTokenSource();
             cancellationTokenSourceLoop = new CancellationTokenSource();
@@ -141,7 +134,7 @@ namespace TwitchStreamDownloader.Download
             string requestClientId = clientId ?? "kimne78kx3ncx6brgo4mv6wki5h1ko";
             string requestOauth = oauth ?? undefined;
 
-            return await GqlNet.GetAccessToken(client, channel, requestClientId, DeviceId, requestOauth, cancellationTokenSourceLoop.Token);
+            return await GqlNet.GetAccessToken(httpClient, channel, requestClientId, DeviceId, requestOauth, cancellationTokenSourceLoop.Token);
         }
 
         /// <summary>
@@ -257,7 +250,7 @@ namespace TwitchStreamDownloader.Download
                     {
                         requestMessage.Headers.Add("Accept", "application/x-mpegURL, application/vnd.apple.mpegurl, application/json, text/plain");
 
-                        using var response = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationToken);
+                        using var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationToken);
                         responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
 
                         if (response.StatusCode != HttpStatusCode.OK)
@@ -282,7 +275,7 @@ namespace TwitchStreamDownloader.Download
 
                     try
                     {
-                        await MediaLoop(playlist, cancellationToken);
+                        await MediaLoopAsync(playlist, cancellationToken);
                     }
                     catch (TaskCanceledException) when (Disposed || cancellationToken.IsCancellationRequested)
                     {
@@ -329,7 +322,7 @@ namespace TwitchStreamDownloader.Download
             }
         }
 
-        private async Task MediaLoop(MasterPlaylist masterPlaylist, CancellationToken cancellationToken)
+        private async Task MediaLoopAsync(MasterPlaylist masterPlaylist, CancellationToken cancellationToken)
         {
             VariantStream? variantStream = null;
 
@@ -377,7 +370,7 @@ namespace TwitchStreamDownloader.Download
                 string responseContent;
                 using (var requestMessage = new HttpRequestMessage(HttpMethod.Get, variantStream.uri))
                 {
-                    using HttpResponseMessage responseMessage = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationToken);
+                    using HttpResponseMessage responseMessage = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationToken);
                     responseContent = await responseMessage.Content.ReadAsStringAsync(cancellationToken);
 
                     if (responseMessage.StatusCode != HttpStatusCode.OK)
@@ -463,44 +456,6 @@ namespace TwitchStreamDownloader.Download
             Start();
         }
 
-        /// <param name="uri"></param>
-        /// <param name="writeStream"></param>
-        /// <param name="token"></param>
-        /// <exception cref="TaskCanceledException">Токен отменился.</exception>
-        public async Task<bool> TryDownload(Uri uri, Stream writeStream, CancellationToken token)
-        {
-            try
-            {
-                using var cancelSus = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokenSourceWeb.Token, token);
-                using var requestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-                using var response = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancelSus.Token);
-
-                if (response.StatusCode != HttpStatusCode.OK)
-                {
-                    string responseContent = await response.Content.ReadAsStringAsync(CancellationToken.None);
-
-                    throw new BadCodeException(response.StatusCode, responseContent);
-                }
-
-                await response.Content.CopyToAsync(writeStream, cancelSus.Token);
-
-                return true;
-            }
-            catch (TaskCanceledException) when (!token.IsCancellationRequested)
-            {
-                return false;
-            }
-            catch (TaskCanceledException)
-            {
-                throw;
-            }
-            catch (Exception e)
-            {
-                OnSegmentDownloadException(e);
-                return false;
-            }
-        }
-
         #region Events
         private void OnPlaylistEnded()
         {
@@ -515,11 +470,6 @@ namespace TwitchStreamDownloader.Download
         private void OnMediaPlaylistException(Exception e)
         {
             MediaPlaylistExceptionOccured?.Invoke(this, e);
-        }
-
-        private void OnSegmentDownloadException(Exception e)
-        {
-            SegmentDownloadExceptionOccured?.Invoke(this, e);
         }
 
         private void OnMediaQualitySelected(VariantStream variantStream)
@@ -563,7 +513,6 @@ namespace TwitchStreamDownloader.Download
             try { cancellationTokenSourceWeb.Cancel(); } catch { }
             try { cancellationTokenSourceLoop.Cancel(); } catch { }
 
-            client.Dispose();
             cancellationTokenSourceWeb.Dispose();
             cancellationTokenSourceLoop.Dispose();
 

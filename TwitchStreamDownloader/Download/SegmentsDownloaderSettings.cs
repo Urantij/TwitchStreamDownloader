@@ -56,7 +56,5 @@ namespace TwitchStreamDownloader.Download
         /// Должно сработать, если синхронизировать по времени намберы плейлистов
         /// </summary>
         public bool fastBread = false;
-        public string userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36";
-        public IWebProxy? proxy = null;
     }
 }
