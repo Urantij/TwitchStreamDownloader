@@ -5,7 +5,7 @@ namespace TwitchStreamDownloader.Exceptions
     /// </summary>
     public class NoQualityException : Exception
     {
-        public string[] options;
+        public readonly string[] options;
 
         public NoQualityException(string[] options)
             : base($"Cant find quality. Options: {string.Join(',', options)}")

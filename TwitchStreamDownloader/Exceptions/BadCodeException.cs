@@ -2,6 +2,9 @@ using System.Net;
 
 namespace TwitchStreamDownloader.Exceptions
 {
+    /// <summary>
+    /// Если http запрос выдал не саксес
+    /// </summary>
     public class BadCodeException : Exception
     {
         public readonly HttpStatusCode statusCode;

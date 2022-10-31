@@ -24,7 +24,7 @@ namespace TwitchStreamDownloader.Download
         /// <summary>
         /// UTC
         /// </summary>
-        public DateTimeOffset GetEstimatedStreamStartTime()
+        public DateTime GetEstimatedStreamStartTime()
         {
             return addedDate - streamTime;
         }

@@ -91,7 +91,7 @@ namespace TwitchStreamDownloader.Download
         /// <summary>
         /// Выдало ошибку, когда обновлялся токен сам
         /// </summary>
-        public event EventHandler<Exception>? TokenAcquiringException;
+        public event EventHandler<Exception>? TokenAcquiringExceptionOccured;
 
         //дыбажим
         public event Action<MasterPlaylist>? MasterPlaylistDebugHandler;
@@ -104,11 +104,11 @@ namespace TwitchStreamDownloader.Download
             this.clientId = clientId;
             this.oauth = oauth;
 
-            var httpHandler = new SocketsHttpHandler()
+            var httpHandler = new SocketsHttpHandler
             {
                 Proxy = settings.proxy,
+                UseProxy = settings.proxy != null
             };
-            httpHandler.UseProxy = settings.proxy != null;
 
             client = new HttpClient(httpHandler)
             {
@@ -141,9 +141,7 @@ namespace TwitchStreamDownloader.Download
             string requestClientId = clientId ?? "kimne78kx3ncx6brgo4mv6wki5h1ko";
             string requestOauth = oauth ?? undefined;
 
-            var access = await GqlNet.GetAccessToken(client, channel, requestClientId, DeviceId, requestOauth, cancellationTokenSourceLoop.Token);
-
-            return access;
+            return await GqlNet.GetAccessToken(client, channel, requestClientId, DeviceId, requestOauth, cancellationTokenSourceLoop.Token);
         }
 
         /// <summary>
@@ -170,7 +168,7 @@ namespace TwitchStreamDownloader.Download
                 {
                     TokenAcquiranceFailedAttempts++;
 
-                    TokenAcquiringException?.Invoke(this, e);
+                    TokenAcquiringExceptionOccured?.Invoke(this, e);
 
                     bool shortDelay;
                     if (oauth != null && settings.oauthTokenFailedAttemptsLimit != -1 && TokenAcquiranceFailedAttempts >= settings.oauthTokenFailedAttemptsLimit)
@@ -566,8 +564,8 @@ namespace TwitchStreamDownloader.Download
             try { cancellationTokenSourceLoop.Cancel(); } catch { }
 
             client.Dispose();
-            try { cancellationTokenSourceWeb.Dispose(); } catch { }
-            try { cancellationTokenSourceLoop.Dispose(); } catch { }
+            cancellationTokenSourceWeb.Dispose();
+            cancellationTokenSourceLoop.Dispose();
 
             GC.SuppressFinalize(this);
         }

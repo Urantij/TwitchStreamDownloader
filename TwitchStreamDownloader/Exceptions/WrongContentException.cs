@@ -1,5 +1,8 @@
 namespace TwitchStreamDownloader.Exceptions
 {
+    /// <summary>
+    /// Если не удалось пропарсить
+    /// </summary>
     public class WrongContentException : Exception
     {
         public readonly string place;

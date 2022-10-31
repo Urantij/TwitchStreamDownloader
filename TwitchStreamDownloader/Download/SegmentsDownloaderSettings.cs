@@ -32,12 +32,12 @@ namespace TwitchStreamDownloader.Download
         /// Вечно у твича отваливается жопа. Первый ретрай будет ждать меньше.
         /// Алсо, если токен меняется автомат с oauth на нул, то тоже будет это время
         /// </summary>
-        public TimeSpan shortAccessTokenRetryDelay = TimeSpan.FromSeconds(20);
+        public TimeSpan shortAccessTokenRetryDelay = TimeSpan.FromSeconds(5);
 
         /// <summary>
-        /// 2 min default
+        /// 20 sec default
         /// </summary>
-        public TimeSpan accessTokenRetryDelay = TimeSpan.FromMinutes(2);
+        public TimeSpan accessTokenRetryDelay = TimeSpan.FromSeconds(20);
 
         /// <summary>
         /// Если мастер лист выдал 403, нужно обновлять токен
@@ -56,7 +56,7 @@ namespace TwitchStreamDownloader.Download
         /// Должно сработать, если синхронизировать по времени намберы плейлистов
         /// </summary>
         public bool fastBread = false;
-        public string userAgent = "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.101 Mobile Safari/537.36";
+        public string userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36";
         public IWebProxy? proxy = null;
     }
 }

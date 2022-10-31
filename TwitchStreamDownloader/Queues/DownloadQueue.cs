@@ -14,7 +14,7 @@ namespace TwitchStreamDownloader.Queues
         /// </summary>
         public readonly Stream bufferWriteStream;
 
-        public readonly Task operationTask;
+        public readonly Task downloadOperationTask;
 
         /// <summary>
         /// Произошла ли запись в буффер.
@@ -22,11 +22,11 @@ namespace TwitchStreamDownloader.Queues
         /// </summary>
         public bool written = false;
 
-        public QueueItem(StreamSegment segment, Stream bufferWriteStream, Task operationTask)
+        public QueueItem(StreamSegment segment, Stream bufferWriteStream, Task downloadOperationTask)
         {
             this.segment = segment;
             this.bufferWriteStream = bufferWriteStream;
-            this.operationTask = operationTask;
+            this.downloadOperationTask = downloadOperationTask;
         }
     }
 
@@ -59,7 +59,7 @@ namespace TwitchStreamDownloader.Queues
         public event EventHandler<QueueItem>? ItemDequeued;
         public event EventHandler<Exception>? ExceptionOccured;
 
-        public async Task Download(StreamSegment segment, SegmentsDownloader downloader, Stream bufferWriteStream, TimeSpan timeout)
+        public async Task DownloadAsync(StreamSegment segment, SegmentsDownloader downloader, Stream bufferWriteStream, TimeSpan timeout)
         {
             TaskCompletionSource taskSource = new();
 
@@ -80,10 +80,14 @@ namespace TwitchStreamDownloader.Queues
             taskSource.SetResult();
         }
 
+        /// <summary>
+        /// Когда хуйня скачалась или затаймаутилась. в порядке очереди.
+        /// НЕ СТОИТ ЕЁ await, иначе будешь обрабатывать поток загрузки у себя весь.
+        /// </summary>
         /// <param name="segment"></param>
         /// <returns></returns>
         /// <exception cref="InvalidOperationException">Если сегмента нет в списке. Всегда download должен быть первым, хз</exception>
-        public async void Queue(StreamSegment segment)
+        public async Task QueueAsync(StreamSegment segment)
         {
             lock (locker)
             {
@@ -110,7 +114,7 @@ namespace TwitchStreamDownloader.Queues
                     }
                 }
 
-                await item.operationTask;
+                await item.downloadOperationTask;
 
                 try
                 {
