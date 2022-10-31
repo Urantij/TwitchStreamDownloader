@@ -1,9 +1,9 @@
 using System;
 using System.Net;
-using PlaylistParser.Models;
-using PlaylistParser.Parsers;
-using PlaylistParser.Playlists;
-using PlaylistParser.Tags.Master;
+using ExtM3UPlaylistParser.Models;
+using ExtM3UPlaylistParser.Parsers;
+using ExtM3UPlaylistParser.Playlists;
+using ExtM3UPlaylistParser.Tags.Master;
 using TwitchStreamDownloader.Exceptions;
 using TwitchStreamDownloader.Net;
 using TwitchStreamDownloader.Resources;
