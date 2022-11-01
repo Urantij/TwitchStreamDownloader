@@ -76,31 +76,21 @@ namespace TwitchStreamDownloader.Queues
         /// Эта штука кидает ошибки, если чето не загрузится.
         /// Использовать после Queue
         /// </summary>
-        /// <param name="httpClient"></param>
-        /// <param name="segment"></param>
-        /// <returns></returns>
-        /// <exception cref="InvalidOperationException">Если сегмента нет в списке. Всегда Queue должен быть первым</exception>
         /// <exception cref="Exception">Куча всего.</exception>
-        public async Task DownloadAsync(HttpClient httpClient, StreamSegment segment)
+        public async Task DownloadAsync(HttpClient httpClient, QueueItem queueItem)
         {
-            QueueItem item;
-            lock (locker)
-            {
-                item = queue.First(i => i.segment == segment);
-            }
-
             //наверное, если тут уже пошла загрузка, отменять не супер идея, но с другой стороны, хуй знает че там и как
             try
             {
                 using var downloadCts = new CancellationTokenSource(downloadTimeout);
 
-                await DownloadVideoAsync(httpClient, segment.uri, item.bufferWriteStream, downloadCts.Token);
+                await DownloadVideoAsync(httpClient, queueItem.segment.uri, queueItem.bufferWriteStream, downloadCts.Token);
 
-                item.SetWritten();
+                queueItem.SetWritten();
             }
             catch
             {
-                item.SetNotWritten();
+                queueItem.SetNotWritten();
                 throw;
             }
         }
@@ -108,9 +98,7 @@ namespace TwitchStreamDownloader.Queues
         /// <summary>
         /// Кладёт в очередь.
         /// </summary>
-        /// <param name="segment"></param>
-        /// <returns></returns>
-        public void Queue(StreamSegment segment, Stream bufferWriteStream)
+        public QueueItem Queue(StreamSegment segment, Stream bufferWriteStream)
         {
             var item = new QueueItem(segment, bufferWriteStream);
 
@@ -119,12 +107,14 @@ namespace TwitchStreamDownloader.Queues
                 queue.Enqueue(item);
 
                 if (processing)
-                    return;
+                    return item;
 
                 processing = true;
             }
 
             _ = Task.Run(ProcessingLoopAsync);
+
+            return item;
         }
 
         async void ProcessingLoopAsync()
