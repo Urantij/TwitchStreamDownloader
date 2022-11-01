@@ -15,30 +15,39 @@ namespace TwitchStreamDownloader.Queues
         /// </summary>
         public readonly Stream bufferWriteStream;
 
-        public readonly Task downloadOperationTask;
-
         /// <summary>
         /// Произошла ли запись в буффер.
         /// Может быть и произошла, кстати.
         /// </summary>
-        public bool written = false;
+        public bool Written { get; private set; } = false;
 
-        public QueueItem(StreamSegment segment, Stream bufferWriteStream, Task downloadOperationTask)
+        public Task DownloadTask => tcs.Task;
+
+        readonly TaskCompletionSource tcs = new();
+
+        public QueueItem(StreamSegment segment, Stream bufferWriteStream)
         {
             this.segment = segment;
             this.bufferWriteStream = bufferWriteStream;
-            this.downloadOperationTask = downloadOperationTask;
+        }
+
+        public void SetWritten()
+        {
+            Written = true;
+            tcs.SetResult();
+        }
+
+        public void SetNotWritten()
+        {
+            Written = false;
+            tcs.SetResult();
         }
     }
 
     /// <summary>
     /// Этот класс отвечает за загрузку сегментов из интернета и выдачу их по порядку.
     /// Типа более поздний сегмент может скачаться раньше...
-    /// И значит сначала вызывается метод для вызова загрузки, а потом метод очереди.
-    /// То есть метод очереди задаёт, собсо, порядок сегментов в очереди, а метод загрузки просто качает.
-    /// Таким образом можно юзать очередь и для одного потока сегментов и для многих.
-    /// И метод очереди должен юзаться ВСЕГДА после метода загрузки.
-    /// И желательно, чтобы метод очереди тоже всегда юзался, или сегменты в загрузке будут до диспоуза отдыхать.
+    /// Сначала нужно задавать очередь, а потом загружать.
     /// </summary>
     public class DownloadQueue : IDisposable
     {
@@ -48,9 +57,6 @@ namespace TwitchStreamDownloader.Queues
 
         private readonly TimeSpan downloadTimeout;
 
-        /* лайв пришёл раньше очередного, пусть обтекает
-         * в теории очередной может вообще не прийти, но блять */
-        private readonly List<QueueItem> liveList = new();
         //тута в очереди
         private readonly Queue<QueueItem> queue = new();
 
@@ -68,22 +74,19 @@ namespace TwitchStreamDownloader.Queues
 
         /// <summary>
         /// Эта штука кидает ошибки, если чето не загрузится.
-        /// Queue в любом случае нужно будет использовать после.
-        /// Иначе смэрть.
+        /// Использовать после Queue
         /// </summary>
         /// <param name="httpClient"></param>
         /// <param name="segment"></param>
-        /// <param name="bufferWriteStream"></param>
         /// <returns></returns>
+        /// <exception cref="InvalidOperationException">Если сегмента нет в списке. Всегда Queue должен быть первым</exception>
         /// <exception cref="Exception">Куча всего.</exception>
-        public async Task DownloadAsync(HttpClient httpClient, StreamSegment segment, Stream bufferWriteStream)
+        public async Task DownloadAsync(HttpClient httpClient, StreamSegment segment)
         {
-            TaskCompletionSource taskSource = new();
-
-            var item = new QueueItem(segment, bufferWriteStream, taskSource.Task);
+            QueueItem item;
             lock (locker)
             {
-                liveList.Add(item);
+                item = queue.First(i => i.segment == segment);
             }
 
             //наверное, если тут уже пошла загрузка, отменять не супер идея, но с другой стороны, хуй знает че там и как
@@ -91,31 +94,28 @@ namespace TwitchStreamDownloader.Queues
             {
                 using var downloadCts = new CancellationTokenSource(downloadTimeout);
 
-                await DownloadVideoAsync(httpClient, segment.uri, bufferWriteStream, downloadCts.Token);
+                await DownloadVideoAsync(httpClient, segment.uri, item.bufferWriteStream, downloadCts.Token);
 
-                item.written = true;
-                taskSource.SetResult();
+                item.SetWritten();
             }
             catch
             {
-                taskSource.SetResult();
+                item.SetNotWritten();
                 throw;
             }
         }
 
         /// <summary>
-        /// Кладёт в очередь. Использовать после DownloadAsync.
+        /// Кладёт в очередь.
         /// </summary>
         /// <param name="segment"></param>
         /// <returns></returns>
-        /// <exception cref="InvalidOperationException">Если сегмента нет в списке. Всегда download должен быть первым, хз</exception>
-        public void Queue(StreamSegment segment)
+        public void Queue(StreamSegment segment, Stream bufferWriteStream)
         {
+            var item = new QueueItem(segment, bufferWriteStream);
+
             lock (locker)
             {
-                QueueItem item = liveList.First(q => q.segment == segment);
-                liveList.Remove(item);
-
                 queue.Enqueue(item);
 
                 if (processing)
@@ -141,7 +141,7 @@ namespace TwitchStreamDownloader.Queues
                     }
                 }
 
-                await item.downloadOperationTask;
+                await item.DownloadTask;
 
                 ItemDequeued?.Invoke(this, item);
             }
@@ -174,12 +174,6 @@ namespace TwitchStreamDownloader.Queues
             lock (locker)
             {
                 //если остались непонятные ливы, их непонятные ресы нужно задиспоузить, мало ли
-                foreach (var live in liveList)
-                {
-                    live.bufferWriteStream.Dispose();
-                }
-                liveList.Clear();
-
                 foreach (var q in queue)
                 {
                     q.bufferWriteStream.Dispose();
