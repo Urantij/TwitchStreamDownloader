@@ -403,8 +403,9 @@ namespace TwitchStreamDownloader.Download
                     {
                         continue;
                     }
-
-                    if (currentMediaSequenceNumber <= LastMediaSequenceNumber && LastMediaTime >= mediaSegment.programDateTag.time) continue;
+                    
+                    if (LastMediaTime >= mediaSegment.programDateTag.time) continue;
+                    if (currentMediaSequenceNumber <= LastMediaSequenceNumber) continue;
 
                     LastMediaTime = mediaSegment.programDateTag.time;
                     LastMediaSequenceNumber = currentMediaSequenceNumber;
