@@ -42,7 +42,8 @@ namespace TwitchStreamDownloader.Download
         /// </summary>
         public DateTime? LastMediaPlaylistUpdate { get; private set; } = null;
 
-        public string? LastVideo { get; private set; } = null;
+        public string? LastStreamResolution { get; private set; } = null;
+        public float? LastStreamFramerate { get; private set; } = null;
 
         //Предполагалось, что сюда можно будет руками из кеша положить, но мне стало впадлу.
         public AccessToken? Access { get; private set; }
@@ -326,22 +327,19 @@ namespace TwitchStreamDownloader.Download
         {
             VariantStream? variantStream = null;
 
-            if (LastVideo != null)
+            if (LastStreamResolution != null)
             {
-                variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => string.Equals(s.streamInfTag.video, LastVideo, StringComparison.Ordinal) /*s.streamInfTag.video == LastVideo*/);
+                variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => string.Equals(s.streamInfTag.resolution, LastStreamResolution, StringComparison.OrdinalIgnoreCase) && s.streamInfTag.frameRate == LastStreamFramerate);
             }
 
-            if (variantStream == null && settings.preferredQuality != null)
+            if (variantStream == null && settings.preferredResolution != null)
             {
-                //video вроде всегда есть
-
-                //формат video выглядит как 720p60
-                VariantStream[] qualityStreams = masterPlaylist.variantStreams.Where(s => s.streamInfTag.video!.StartsWith(settings.preferredQuality))
+                VariantStream[] qualityStreams = masterPlaylist.variantStreams.Where(s => string.Equals(s.streamInfTag.resolution, settings.preferredResolution, StringComparison.OrdinalIgnoreCase))
                                                                               .ToArray();
 
                 if (settings.preferredFps != null)
                 {
-                    variantStream = qualityStreams.FirstOrDefault(s => s.streamInfTag.video!.EndsWith(settings.preferredFps));
+                    variantStream = qualityStreams.FirstOrDefault(s => s.streamInfTag.frameRate == settings.preferredFps);
 
                     if (variantStream == null)
                         variantStream = qualityStreams.FirstOrDefault();
@@ -353,7 +351,7 @@ namespace TwitchStreamDownloader.Download
 
                 if (variantStream == null && settings.takeOnlyPreferredQuality)
                 {
-                    var videos = masterPlaylist.variantStreams.Select(s => s.streamInfTag.video!).ToArray();
+                    var videos = masterPlaylist.variantStreams.Select(s => $"{s.streamInfTag.resolution} {s.streamInfTag.frameRate}").ToArray();
 
                     throw new NoQualityException(videos);
                 }
@@ -363,7 +361,9 @@ namespace TwitchStreamDownloader.Download
                 variantStream = masterPlaylist.variantStreams.First();
 
             OnMediaQualitySelected(variantStream);
-            LastVideo = variantStream.streamInfTag.video!;
+            // Ну они вроде всегда есть.
+            LastStreamResolution = variantStream.streamInfTag.resolution!;
+            LastStreamFramerate = variantStream.streamInfTag.frameRate!;
 
             while (!Disposed && !cancellationToken.IsCancellationRequested)
             {
@@ -411,7 +411,7 @@ namespace TwitchStreamDownloader.Download
                     LastMediaSequenceNumber = currentMediaSequenceNumber;
 
                     //title вроде всегда есть
-                    StreamSegment segmentInfo = new(mediaSegment.uri, mediaSegment.infTag.title!, currentMediaSequenceNumber, mediaSegment.infTag.duration, mediaSegment.programDateTag.time, LastVideo);
+                    StreamSegment segmentInfo = new(mediaSegment.uri, mediaSegment.infTag.title, currentMediaSequenceNumber, mediaSegment.infTag.duration, mediaSegment.programDateTag.time, LastStreamResolution, LastStreamFramerate.Value);
 
                     OnSegmentArrived(segmentInfo);
 

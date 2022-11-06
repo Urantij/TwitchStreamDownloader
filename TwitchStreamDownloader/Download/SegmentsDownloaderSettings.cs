@@ -7,8 +7,16 @@ namespace TwitchStreamDownloader.Download
         //Если есть качество, возьмёт это качество. По возможности также возьмёт фпс.
         //Если есть фпс, но нет качествао, то па е бать ыхых
         //TODO если нулл, должен брать сурс, но скорее всего будет брать срань
-        public string? preferredQuality = null;
-        public string? preferredFps = null;
+        /// <summary>
+        /// 1920x1080
+        /// 1280x720
+        /// </summary>
+        public string? preferredResolution = null;
+        /// <summary>
+        /// 60
+        /// 30
+        /// </summary>
+        public float? preferredFps = null;
 
         /// <summary>
         /// Только для качества, не фпс. Чтобы не начать случайно качать сурс вместо 720п
