@@ -117,7 +117,7 @@ namespace TwitchStreamDownloader.Queues
             return item;
         }
 
-        async void ProcessingLoopAsync()
+        async Task ProcessingLoopAsync()
         {
             while (!Disposed)
             {

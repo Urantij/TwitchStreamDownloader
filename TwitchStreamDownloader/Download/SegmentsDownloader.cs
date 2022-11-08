@@ -197,21 +197,11 @@ namespace TwitchStreamDownloader.Download
         /// <summary>
         /// Будет качать пока не остановят
         /// </summary>
-        public async void Start()
+        public void Start()
         {
             var currentToken = cancellationTokenSourceLoop.Token;
 
-            if (Access == null)
-            {
-                Access = await RequestTokenToTheLimit(currentToken);
-
-                if (Access == null)
-                    return;
-            }
-
-            var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.fastBread, SessionId, random);
-
-            StartMasterLoop(usherUri, currentToken);
+            _ = Task.Run(() => InitiateAsync(currentToken));
         }
 
         /// <summary>
@@ -227,7 +217,22 @@ namespace TwitchStreamDownloader.Download
             //LastMediaSequenceNumber = -1; нет же смысла. даже если фастбред включён, первые сегменты дадут время
         }
 
-        private async void StartMasterLoop(Uri usherUri, CancellationToken cancellationToken)
+        private async Task InitiateAsync(CancellationToken cancellationToken)
+        {
+            if (Access == null)
+            {
+                Access = await RequestTokenToTheLimit(cancellationToken);
+
+                if (Access == null)
+                    return;
+            }
+
+            var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.fastBread, SessionId, random);
+
+            _ = Task.Run(() => MasterLoopAsync(usherUri, cancellationToken), cancellationToken);
+        }
+
+        private async Task MasterLoopAsync(Uri usherUri, CancellationToken cancellationToken)
         {
             //ну вот мало ли выскочит непонятная ошибка, и ждать плейлист не будет в итоге
             DateTime? lastMasterPlaylistRequestDate = null;
