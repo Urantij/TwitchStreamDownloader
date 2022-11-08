@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using ExtM3UPlaylistParser.Models;
+using TwitchStreamDownloader.Extensions;
 
 namespace TwitchStreamDownloader.Download;
 
@@ -15,5 +16,10 @@ public class Quality
     {
         this.resolution = resolution;
         this.fps = fps;
+    }
+
+    public bool Same(Quality quality)
+    {
+        return this.resolution.Same(quality.resolution) && this.fps == quality.fps;
     }
 }
