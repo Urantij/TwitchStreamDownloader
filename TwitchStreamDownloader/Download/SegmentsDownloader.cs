@@ -35,7 +35,10 @@ namespace TwitchStreamDownloader.Download
         /// програмдейт последнего сегмента
         /// </summary>
         public DateTimeOffset? LastMediaTime { get; private set; } = null;
-        public int LastMediaSequenceNumber { get; private set; } = -1;
+        /// <summary>
+        /// Последний номер в текущей загрузки. Если mediaplaylist сменился, становится null
+        /// </summary>
+        public int? LastMediaSequenceNumber { get; private set; } = null;
 
         public MasterPlaylistPrint? LastMasterPlaylistPrint { get; private set; }
         /// <summary>
@@ -301,6 +304,10 @@ namespace TwitchStreamDownloader.Download
                         OnMediaPlaylistException(e);
                         continue;
                     }
+                    finally
+                    {
+                        LastMediaSequenceNumber = null;
+                    }
 
                     //если не вылет, значит закончился
                     OnPlaylistEnded();
@@ -430,9 +437,6 @@ namespace TwitchStreamDownloader.Download
 
                 if (mediaPlaylist.endList)
                 {
-                    //зачем это обнулять? время же не движется назать блять
-                    //LastMediaTime = null;
-                    LastMediaSequenceNumber = -1;
                     return;
                 }
 
