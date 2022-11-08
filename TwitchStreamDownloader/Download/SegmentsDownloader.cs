@@ -354,7 +354,8 @@ namespace TwitchStreamDownloader.Download
 
             if (LastStreamQuality != null)
             {
-                variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => s.streamInfTag.resolution!.Same(LastStreamQuality.resolution) && s.streamInfTag.frameRate == LastStreamQuality.fps);
+                // Есть аудиоонли, да
+                variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => s.streamInfTag.resolution?.Same(LastStreamQuality.resolution) == true && s.streamInfTag.frameRate == LastStreamQuality.fps);
             }
 
             if (variantStream == null && settings.preferredResolution != null)
