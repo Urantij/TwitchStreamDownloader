@@ -9,10 +9,10 @@ namespace TwitchStreamDownloader.Download;
 
 public class Quality
 {
-    public readonly Resolution resolution;
+    public readonly Resolution? resolution;
     public readonly float fps;
 
-    public Quality(Resolution resolution, float fps)
+    public Quality(Resolution? resolution, float fps)
     {
         this.resolution = resolution;
         this.fps = fps;
@@ -20,6 +20,9 @@ public class Quality
 
     public bool Same(Quality quality)
     {
-        return this.resolution.Same(quality.resolution) && this.fps == quality.fps;
+        if (quality.resolution != null)
+            return this.resolution?.Same(quality.resolution) == true && this.fps == quality.fps;
+
+        return this.resolution == null && this.fps == quality.fps;
     }
 }

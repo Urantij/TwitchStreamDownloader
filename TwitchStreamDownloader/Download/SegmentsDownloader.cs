@@ -355,12 +355,12 @@ namespace TwitchStreamDownloader.Download
             if (LastStreamQuality != null)
             {
                 // Есть аудиоонли, да
-                variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => s.streamInfTag.resolution?.Same(LastStreamQuality.resolution) == true && s.streamInfTag.frameRate == LastStreamQuality.fps);
+                variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => ResolutionExtensions.Compare(s.streamInfTag.resolution, LastStreamQuality.resolution) && s.streamInfTag.frameRate == LastStreamQuality.fps);
             }
 
             if (variantStream == null && settings.preferredResolution != null)
             {
-                VariantStream[] qualityStreams = masterPlaylist.variantStreams.Where(s => s.streamInfTag.resolution!.Same(settings.preferredResolution))
+                VariantStream[] qualityStreams = masterPlaylist.variantStreams.Where(s => settings.preferredResolution.Same(s.streamInfTag.resolution))
                                                                               .ToArray();
 
                 if (settings.preferredFps != null)
@@ -387,7 +387,7 @@ namespace TwitchStreamDownloader.Download
                 variantStream = masterPlaylist.variantStreams.First();
 
             // Ну они вроде всегда есть.
-            var quality = new Quality(variantStream.streamInfTag.resolution!, variantStream.streamInfTag.frameRate!.Value);
+            var quality = new Quality(variantStream.streamInfTag.resolution, variantStream.streamInfTag.frameRate!.Value);
 
             OnMediaQualitySelected(variantStream, quality);
             LastStreamQuality = quality;
