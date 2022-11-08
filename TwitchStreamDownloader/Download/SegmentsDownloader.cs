@@ -11,6 +11,18 @@ using TwitchStreamDownloader.Resources;
 
 namespace TwitchStreamDownloader.Download
 {
+    public class MediaQualitySelectedEventArgs : EventArgs
+    {
+        public VariantStream VariantStream { get; set; }
+        public Quality Quality { get; set; }
+
+        public MediaQualitySelectedEventArgs(VariantStream variantStream, Quality quality)
+        {
+            VariantStream = variantStream;
+            Quality = quality;
+        }
+    }
+
     public class LineEventArgs : EventArgs
     {
         public bool Master { get; set; }
@@ -74,7 +86,7 @@ namespace TwitchStreamDownloader.Download
         /// <summary>
         /// <see cref="LastStreamQuality"/> содержит предыдущее качество
         /// </summary>
-        public event EventHandler<VariantStream>? MediaQualitySelected;
+        public event EventHandler<MediaQualitySelectedEventArgs>? MediaQualitySelected;
         /// <summary>
         /// Сюда прибывают сегменты
         /// </summary>
@@ -373,9 +385,11 @@ namespace TwitchStreamDownloader.Download
             if (variantStream == null)
                 variantStream = masterPlaylist.variantStreams.First();
 
-            OnMediaQualitySelected(variantStream);
             // Ну они вроде всегда есть.
-            LastStreamQuality = new Quality(variantStream.streamInfTag.resolution!, variantStream.streamInfTag.frameRate!.Value);
+            var quality = new Quality(variantStream.streamInfTag.resolution!, variantStream.streamInfTag.frameRate!.Value);
+
+            OnMediaQualitySelected(variantStream, quality);
+            LastStreamQuality = quality;
 
             while (!Disposed && !cancellationToken.IsCancellationRequested)
             {
@@ -483,9 +497,9 @@ namespace TwitchStreamDownloader.Download
             MediaPlaylistExceptionOccured?.Invoke(this, e);
         }
 
-        private void OnMediaQualitySelected(VariantStream variantStream)
+        private void OnMediaQualitySelected(VariantStream variantStream, Quality quality)
         {
-            MediaQualitySelected?.Invoke(this, variantStream);
+            MediaQualitySelected?.Invoke(this, new MediaQualitySelectedEventArgs(variantStream, quality));
         }
 
         private void OnSegmentArrived(StreamSegment segmentInfo)
