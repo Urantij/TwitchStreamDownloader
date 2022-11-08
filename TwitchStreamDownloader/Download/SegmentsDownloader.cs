@@ -5,6 +5,7 @@ using ExtM3UPlaylistParser.Parsers;
 using ExtM3UPlaylistParser.Playlists;
 using ExtM3UPlaylistParser.Tags.Master;
 using TwitchStreamDownloader.Exceptions;
+using TwitchStreamDownloader.Extensions;
 using TwitchStreamDownloader.Net;
 using TwitchStreamDownloader.Resources;
 
@@ -42,8 +43,7 @@ namespace TwitchStreamDownloader.Download
         /// </summary>
         public DateTime? LastMediaPlaylistUpdate { get; private set; } = null;
 
-        public string? LastStreamResolution { get; private set; } = null;
-        public float? LastStreamFramerate { get; private set; } = null;
+        public Quality? LastStreamQuality { get; private set; } = null;
 
         //Предполагалось, что сюда можно будет руками из кеша положить, но мне стало впадлу.
         public AccessToken? Access { get; private set; }
@@ -69,7 +69,7 @@ namespace TwitchStreamDownloader.Download
         public event EventHandler<Exception>? MasterPlaylistExceptionOccured;
         public event EventHandler<Exception>? MediaPlaylistExceptionOccured;
         /// <summary>
-        /// LastVideo содержит предыдущее качество
+        /// <see cref="LastStreamQuality"/> содержит предыдущее качество
         /// </summary>
         public event EventHandler<VariantStream>? MediaQualitySelected;
         /// <summary>
@@ -220,6 +220,7 @@ namespace TwitchStreamDownloader.Download
         public void Stop()
         {
             cancellationTokenSourceLoop.Cancel();
+            try { cancellationTokenSourceLoop.Dispose(); } catch { }
             cancellationTokenSourceLoop = new();
 
             //LastMediaTime = null;
@@ -327,14 +328,14 @@ namespace TwitchStreamDownloader.Download
         {
             VariantStream? variantStream = null;
 
-            if (LastStreamResolution != null)
+            if (LastStreamQuality != null)
             {
-                variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => string.Equals(s.streamInfTag.resolution, LastStreamResolution, StringComparison.OrdinalIgnoreCase) && s.streamInfTag.frameRate == LastStreamFramerate);
+                variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => s.streamInfTag.resolution!.Same(LastStreamQuality.resolution) && s.streamInfTag.frameRate == LastStreamQuality.fps);
             }
 
             if (variantStream == null && settings.preferredResolution != null)
             {
-                VariantStream[] qualityStreams = masterPlaylist.variantStreams.Where(s => string.Equals(s.streamInfTag.resolution, settings.preferredResolution, StringComparison.OrdinalIgnoreCase))
+                VariantStream[] qualityStreams = masterPlaylist.variantStreams.Where(s => s.streamInfTag.resolution!.Same(settings.preferredResolution))
                                                                               .ToArray();
 
                 if (settings.preferredFps != null)
@@ -362,8 +363,7 @@ namespace TwitchStreamDownloader.Download
 
             OnMediaQualitySelected(variantStream);
             // Ну они вроде всегда есть.
-            LastStreamResolution = variantStream.streamInfTag.resolution!;
-            LastStreamFramerate = variantStream.streamInfTag.frameRate!;
+            LastStreamQuality = new Quality(variantStream.streamInfTag.resolution!, variantStream.streamInfTag.frameRate!.Value);
 
             while (!Disposed && !cancellationToken.IsCancellationRequested)
             {
@@ -403,7 +403,7 @@ namespace TwitchStreamDownloader.Download
                     {
                         continue;
                     }
-                    
+
                     if (LastMediaTime >= mediaSegment.programDateTag.time) continue;
                     if (currentMediaSequenceNumber <= LastMediaSequenceNumber) continue;
 
@@ -411,7 +411,7 @@ namespace TwitchStreamDownloader.Download
                     LastMediaSequenceNumber = currentMediaSequenceNumber;
 
                     //title вроде всегда есть
-                    StreamSegment segmentInfo = new(mediaSegment.uri, mediaSegment.infTag.title, currentMediaSequenceNumber, mediaSegment.infTag.duration, mediaSegment.programDateTag.time, LastStreamResolution, LastStreamFramerate.Value);
+                    StreamSegment segmentInfo = new(mediaSegment.uri, mediaSegment.infTag.title, currentMediaSequenceNumber, mediaSegment.infTag.duration, mediaSegment.programDateTag.time, LastStreamQuality);
 
                     OnSegmentArrived(segmentInfo);
 
@@ -450,6 +450,7 @@ namespace TwitchStreamDownloader.Download
         public void DropToken()
         {
             cancellationTokenSourceLoop.Cancel();
+            try { cancellationTokenSourceLoop.Dispose(); } catch { }
             cancellationTokenSourceLoop = new();
 
             Access = null;

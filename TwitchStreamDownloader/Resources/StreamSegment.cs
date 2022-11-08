@@ -1,3 +1,5 @@
+using TwitchStreamDownloader.Download;
+
 namespace TwitchStreamDownloader.Resources
 {
     public class StreamSegment
@@ -11,18 +13,16 @@ namespace TwitchStreamDownloader.Resources
         public readonly float duration;
         public readonly DateTimeOffset programDate;
 
-        public readonly string resolution;
-        public readonly float framerate;
+        public readonly Quality quality;
 
-        public StreamSegment(Uri uri, string? title, int mediaSequenceNumber, float duration, DateTimeOffset programDate, string resolution, float framerate)
+        public StreamSegment(Uri uri, string? title, int mediaSequenceNumber, float duration, DateTimeOffset programDate, Quality quality)
         {
             this.uri = uri;
             this.title = title;
             this.mediaSequenceNumber = mediaSequenceNumber;
             this.duration = duration;
             this.programDate = programDate;
-            this.resolution = resolution;
-            this.framerate = framerate;
+            this.quality = quality;
         }
 
         public bool IsLive => string.Equals(title, "live", StringComparison.OrdinalIgnoreCase);

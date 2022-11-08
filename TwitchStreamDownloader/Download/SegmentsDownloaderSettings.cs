@@ -1,4 +1,5 @@
 using System.Net;
+using ExtM3UPlaylistParser.Models;
 
 namespace TwitchStreamDownloader.Download
 {
@@ -7,11 +8,7 @@ namespace TwitchStreamDownloader.Download
         //Если есть качество, возьмёт это качество. По возможности также возьмёт фпс.
         //Если есть фпс, но нет качествао, то па е бать ыхых
         //TODO если нулл, должен брать сурс, но скорее всего будет брать срань
-        /// <summary>
-        /// 1920x1080
-        /// 1280x720
-        /// </summary>
-        public string? preferredResolution = null;
+        public Resolution? preferredResolution = null;
         /// <summary>
         /// 60
         /// 30
