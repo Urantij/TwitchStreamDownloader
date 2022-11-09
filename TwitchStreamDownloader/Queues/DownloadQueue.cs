@@ -23,7 +23,7 @@ namespace TwitchStreamDownloader.Queues
 
         public Task DownloadTask => tcs.Task;
 
-        readonly TaskCompletionSource tcs = new();
+        readonly TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public QueueItem(StreamSegment segment, Stream bufferWriteStream)
         {
