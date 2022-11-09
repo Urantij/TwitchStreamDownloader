@@ -4,46 +4,6 @@ using TwitchStreamDownloader.Resources;
 
 namespace TwitchStreamDownloader.Queues
 {
-    public class QueueItem
-    {
-        public readonly StreamSegment segment;
-
-        /// <summary>
-        /// Загрузка будет происходит сразу, а не в порядке очереди, если чо.
-        /// Так что копировать нужно в какой-то буфер.
-        /// А потом из буфера куда надо, когда очередь подойдёт.
-        /// </summary>
-        public readonly Stream bufferWriteStream;
-
-        /// <summary>
-        /// Произошла ли запись в буффер.
-        /// Может быть и произошла, кстати.
-        /// </summary>
-        public bool Written { get; private set; } = false;
-
-        public Task DownloadTask => tcs.Task;
-
-        readonly TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public QueueItem(StreamSegment segment, Stream bufferWriteStream)
-        {
-            this.segment = segment;
-            this.bufferWriteStream = bufferWriteStream;
-        }
-
-        public void SetWritten()
-        {
-            Written = true;
-            tcs.SetResult();
-        }
-
-        public void SetNotWritten()
-        {
-            Written = false;
-            tcs.SetResult();
-        }
-    }
-
     /// <summary>
     /// Этот класс отвечает за загрузку сегментов из интернета и выдачу их по порядку.
     /// Типа более поздний сегмент может скачаться раньше...
@@ -57,13 +17,12 @@ namespace TwitchStreamDownloader.Queues
 
         private readonly TimeSpan downloadTimeout;
 
-        //тута в очереди
         private readonly Queue<QueueItem> queue = new();
 
         private bool processing = false;
 
         /// <summary>
-        /// Когда хуйня скачалась или затаймаутилась. в порядке очереди.
+        /// Когда сегмент скачался или затаймаутился. В порядке очереди.
         /// </summary>
         public event EventHandler<QueueItem>? ItemDequeued;
 
@@ -79,7 +38,6 @@ namespace TwitchStreamDownloader.Queues
         /// <exception cref="Exception">Куча всего.</exception>
         public async Task DownloadAsync(HttpClient httpClient, QueueItem queueItem)
         {
-            //наверное, если тут уже пошла загрузка, отменять не супер идея, но с другой стороны, хуй знает че там и как
             try
             {
                 using var downloadCts = new CancellationTokenSource(downloadTimeout);

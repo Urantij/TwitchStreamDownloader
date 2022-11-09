@@ -11,6 +11,18 @@ using TwitchStreamDownloader.Resources;
 
 namespace TwitchStreamDownloader.Download
 {
+    public class TokenAcquiringExceptionEventArgs : EventArgs
+    {
+        public Exception Exception { get; set; }
+        public int Attempts { get; set; }
+
+        public TokenAcquiringExceptionEventArgs(Exception exception, int attempts)
+        {
+            Exception = exception;
+            Attempts = attempts;
+        }
+    }
+
     public class MediaQualitySelectedEventArgs : EventArgs
     {
         public VariantStream VariantStream { get; set; }
@@ -36,8 +48,8 @@ namespace TwitchStreamDownloader.Download
     }
 
     /// <summary>
-    /// Эта залупа просто качает плейлист и выдаёт сегменты в порядке очереди.
-    /// Сегмент в данном случае это инфа о сегменте видео, а не сами видео
+    /// Этот класс просто качает плейлист и выдаёт сегменты в порядке очереди.
+    /// Сегмент в данном случае это инфа о сегменте видео, а не сами видео.
     /// </summary>
     public class SegmentsDownloader : IDisposable
     {
@@ -65,13 +77,11 @@ namespace TwitchStreamDownloader.Download
         public string DeviceId { get; private set; }
         public string SessionId { get; private set; }
 
-        public int TokenAcquiranceFailedAttempts { get; private set; } = 0;
-
         public readonly HttpClient httpClient;
-        //Вообще, раз уж качамба отдельно идёт, нужно бы вынести её. Но да ладно
-        //по факту это отмена всего качатора. можно было бы второй токен связать с этим, но там диспозед есть, так что похуй?
-        private readonly CancellationTokenSource cancellationTokenSourceWeb;
-        private CancellationTokenSource cancellationTokenSourceLoop;
+        /// <summary>
+        /// Токен отмены текущего круга загрузки сегментов
+        /// </summary>
+        private CancellationTokenSource? cancellationTokenSourceLoop;
 
         private readonly Random random = new();
 
@@ -103,11 +113,7 @@ namespace TwitchStreamDownloader.Download
         /// <summary>
         /// Выдало ошибку, когда обновлялся токен сам
         /// </summary>
-        public event EventHandler<Exception>? TokenAcquiringExceptionOccured;
-
-        //дыбажим
-        public event Action<MasterPlaylist>? MasterPlaylistDebugHandler;
-        public event Action<MediaPlaylist>? MediaPlaylistDebugHandler;
+        public event EventHandler<TokenAcquiringExceptionEventArgs>? TokenAcquiringExceptionOccured;
 
         /// <summary>
         /// 
@@ -126,7 +132,6 @@ namespace TwitchStreamDownloader.Download
 
             this.httpClient = httpClient;
 
-            cancellationTokenSourceWeb = new CancellationTokenSource();
             cancellationTokenSourceLoop = new CancellationTokenSource();
 
             DeviceId = GqlNet.GenerateDeviceId(random);
@@ -143,44 +148,39 @@ namespace TwitchStreamDownloader.Download
         /// <exception cref="WrongContentException">Если содержимое ответа не такое, какое хотелось бы.</exception>
         /// <exception cref="TaskCanceledException">Отменили.</exception>
         /// <exception cref="Exception">Скорее всего, не удалось совершить запрос.</exception>
-        public async Task<AccessToken> RequestToken()
+        public async Task<AccessToken> RequestToken(CancellationToken cancellationToken)
         {
             const string undefined = "undefined";
 
             string requestClientId = clientId ?? "kimne78kx3ncx6brgo4mv6wki5h1ko";
             string requestOauth = oauth ?? undefined;
 
-            return await GqlNet.GetAccessToken(httpClient, channel, requestClientId, DeviceId, requestOauth, cancellationTokenSourceLoop.Token);
+            return await GqlNet.GetAccessToken(httpClient, channel, requestClientId, DeviceId, requestOauth, cancellationToken);
         }
 
         /// <summary>
         /// Изо всех сил пытается достать токен. Ошибки не бросает. Ну, хендлеры могут в тевории.
         /// </summary>
-        /// <returns>нулл, если хуйня отменилась</returns>
+        /// <returns>нулл, если круг отменился</returns>
         async Task<AccessToken?> RequestTokenToTheLimit(CancellationToken cancellationToken)
         {
-            /* Вообще, счётчик попыток стоило бы сделать локальной хуйнёй?
-             * А выдавать через аргументы события.
-             * Но дезинг вроде такой, что не может быть два ретрая онлайн за раз.
-             * Так что похуй, надеюсь.
-             * Но тогда не нужно в начале обнулять, если ошибок нет :) */
-            TokenAcquiranceFailedAttempts = 0;
+            int tokenAcquiranceFailedAttempts = 0;
             AccessToken? token = null;
 
             while (token == null && !cancellationToken.IsCancellationRequested && !Disposed)
             {
                 try
                 {
-                    token = await RequestToken();
+                    token = await RequestToken(cancellationToken);
                 }
                 catch (Exception e)
                 {
-                    TokenAcquiranceFailedAttempts++;
+                    tokenAcquiranceFailedAttempts++;
 
-                    TokenAcquiringExceptionOccured?.Invoke(this, e);
+                    TokenAcquiringExceptionOccured?.Invoke(this, new TokenAcquiringExceptionEventArgs(e, tokenAcquiranceFailedAttempts));
 
                     bool shortDelay;
-                    if (oauth != null && settings.oauthTokenFailedAttemptsLimit != -1 && TokenAcquiranceFailedAttempts >= settings.oauthTokenFailedAttemptsLimit)
+                    if (oauth != null && settings.oauthTokenFailedAttemptsLimit != -1 && tokenAcquiranceFailedAttempts >= settings.oauthTokenFailedAttemptsLimit)
                     {
                         SetCreds(null, null);
 
@@ -188,7 +188,10 @@ namespace TwitchStreamDownloader.Download
                     }
                     else
                     {
-                        shortDelay = TokenAcquiranceFailedAttempts == 1;
+                        // Первую ошибку долго не ждём, мб серверу поплохело просто.
+                        // И да, это реальное решение проблемы, такое бывает.
+
+                        shortDelay = tokenAcquiranceFailedAttempts == 1;
                     }
 
                     TimeSpan delay = shortDelay ? settings.shortAccessTokenRetryDelay : settings.accessTokenRetryDelay;
@@ -199,12 +202,10 @@ namespace TwitchStreamDownloader.Download
             //Тупо, что 2 проверки. Но они дешёвые, а алгоритм получше ещё придумать нужно.
             if (token == null || cancellationToken.IsCancellationRequested || Disposed)
             {
-                TokenAcquiranceFailedAttempts = 0;
                 return null;
             }
 
             OnTokenAcquired(token);
-            TokenAcquiranceFailedAttempts = 0;
 
             return token;
         }
@@ -214,9 +215,9 @@ namespace TwitchStreamDownloader.Download
         /// </summary>
         public void Start()
         {
-            var currentToken = cancellationTokenSourceLoop.Token;
+            var ctsl = cancellationTokenSourceLoop = new();
 
-            _ = Task.Run(() => InitiateAsync(currentToken));
+            _ = Task.Run(() => InitiateAsync(ctsl.Token));
         }
 
         /// <summary>
@@ -224,12 +225,15 @@ namespace TwitchStreamDownloader.Download
         /// </summary>
         public void Stop()
         {
-            cancellationTokenSourceLoop.Cancel();
-            try { cancellationTokenSourceLoop.Dispose(); } catch { }
-            cancellationTokenSourceLoop = new();
-
-            //LastMediaTime = null;
-            //LastMediaSequenceNumber = -1; нет же смысла. даже если фастбред включён, первые сегменты дадут время
+            if (cancellationTokenSourceLoop != null && !cancellationTokenSourceLoop.IsCancellationRequested)
+            {
+                cancellationTokenSourceLoop.Cancel();
+                try { cancellationTokenSourceLoop.Dispose(); } catch { }
+            }
+            else
+            {
+                // Вообще, это плохо, наверное. Ну ладно.
+            }
         }
 
         private async Task InitiateAsync(CancellationToken cancellationToken)
@@ -292,8 +296,6 @@ namespace TwitchStreamDownloader.Download
                     var twitchInfoTag = new XTwitchInfoTag(twitchInfoTagInfo.value!);
 
                     LastMasterPlaylistPrint = new MasterPlaylistPrint(DateTime.UtcNow, twitchInfoTag.streamTime);
-
-                    MasterPlaylistDebugHandler?.Invoke(playlist);
 
                     try
                     {
@@ -367,8 +369,7 @@ namespace TwitchStreamDownloader.Download
                 {
                     variantStream = qualityStreams.FirstOrDefault(s => s.streamInfTag.frameRate == settings.preferredFps);
 
-                    if (variantStream == null)
-                        variantStream = qualityStreams.FirstOrDefault();
+                    variantStream ??= qualityStreams.FirstOrDefault();
                 }
                 else
                 {
@@ -383,8 +384,7 @@ namespace TwitchStreamDownloader.Download
                 }
             }
 
-            if (variantStream == null)
-                variantStream = masterPlaylist.variantStreams.First();
+            variantStream ??= masterPlaylist.variantStreams.First();
 
             // Ну они вроде всегда есть.
             var quality = new Quality(variantStream.streamInfTag.resolution, variantStream.streamInfTag.frameRate!.Value);
@@ -413,8 +413,6 @@ namespace TwitchStreamDownloader.Download
                 MediaPlaylist mediaPlaylist = parser.Parse(responseContent);
 
                 LastMediaPlaylistUpdate = DateTime.UtcNow;
-
-                MediaPlaylistDebugHandler?.Invoke(mediaPlaylist);
 
                 int firstMediaSequenceNumber = mediaPlaylist.mediaSequenceTag?.mediaSequenceNumber ?? 0;
 
@@ -473,9 +471,7 @@ namespace TwitchStreamDownloader.Download
         /// </summary>
         public void DropToken()
         {
-            cancellationTokenSourceLoop.Cancel();
-            try { cancellationTokenSourceLoop.Dispose(); } catch { }
-            cancellationTokenSourceLoop = new();
+            Stop();
 
             Access = null;
 
@@ -536,11 +532,12 @@ namespace TwitchStreamDownloader.Download
 
             Disposed = true;
 
-            try { cancellationTokenSourceWeb.Cancel(); } catch { }
-            try { cancellationTokenSourceLoop.Cancel(); } catch { }
+            if (cancellationTokenSourceLoop != null)
+            {
+                try { cancellationTokenSourceLoop.Cancel(); } catch { }
 
-            cancellationTokenSourceWeb.Dispose();
-            cancellationTokenSourceLoop.Dispose();
+                cancellationTokenSourceLoop.Dispose();
+            }
 
             GC.SuppressFinalize(this);
         }

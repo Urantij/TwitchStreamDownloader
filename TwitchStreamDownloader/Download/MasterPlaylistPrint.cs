@@ -14,7 +14,6 @@ namespace TwitchStreamDownloader.Download
         /// </summary>
         public readonly TimeSpan streamTime;
 
-        /// <param name="addedDate">UTC</param>
         public MasterPlaylistPrint(DateTime addedDate, float streamTime)
         {
             this.addedDate = addedDate;
