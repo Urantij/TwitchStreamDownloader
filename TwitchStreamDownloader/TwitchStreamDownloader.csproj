@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1"/>
-    <PackageReference Include="ExtM3U-Playlist-Parser" Version="1.0.1"/>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="ExtM3U-Playlist-Parser" Version="1.0.1" />
   </ItemGroup>
 </Project>
