@@ -1,18 +1,17 @@
-namespace TwitchStreamDownloader.Exceptions
-{
-    /// <summary>
-    /// Если не удалось пропарсить
-    /// </summary>
-    public class WrongContentException : Exception
-    {
-        public readonly string place;
-        public readonly string content;
+namespace TwitchStreamDownloader.Exceptions;
 
-        public WrongContentException(string place, string content, Exception? exception)
-            : base($"Content wasnt parsed properly. ({place})\n{content}", exception)
-        {
-            this.place = place;
-            this.content = content;
-        }
+/// <summary>
+/// Если не удалось пропарсить
+/// </summary>
+public class WrongContentException : Exception
+{
+    public readonly string place;
+    public readonly string content;
+
+    public WrongContentException(string place, string content, Exception? exception)
+        : base($"Content wasnt parsed properly. ({place})\n{content}", exception)
+    {
+        this.place = place;
+        this.content = content;
     }
 }

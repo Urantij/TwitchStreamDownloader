@@ -1,26 +1,25 @@
 using Newtonsoft.Json;
 
 #nullable disable warnings
-namespace TwitchStreamDownloader.Models
-{
-    internal class PlaybackAccessTokenResponseBody
-    {
-        public class Data
-        {
-            public class StreamPlaybackAccessToken
-            {
-                [JsonRequired]
-                public string value;
-                [JsonRequired]
-                public string signature;
-            }
+namespace TwitchStreamDownloader.Models;
 
+internal class PlaybackAccessTokenResponseBody
+{
+    public class Data
+    {
+        public class StreamPlaybackAccessToken
+        {
             [JsonRequired]
-            public StreamPlaybackAccessToken streamPlaybackAccessToken;
+            public string value;
+            [JsonRequired]
+            public string signature;
         }
 
         [JsonRequired]
-        public Data data;
+        public StreamPlaybackAccessToken streamPlaybackAccessToken;
     }
+
+    [JsonRequired]
+    public Data data;
 }
 #nullable restore warnings
