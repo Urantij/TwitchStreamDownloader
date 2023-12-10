@@ -3,6 +3,32 @@
 
 ### Как юзать
 
+```cs
+StreamDownloader downloader = new StreamDownloaderBuilder("channel").Build();
+downloader.SegmentsDownloader.PlaylistEnded += (_, _) => downloader.Close();
+downloader.DownloadQueue.ItemDequeued += async (object? sender, QueueItem qItem) =>
+{
+    try
+    {
+        // Если сегмент был записан в буфер...
+        if (qItem.Written)
+        {
+            // Ето важно
+            qItem.bufferWriteStream.Position = 0;
+
+            // В qItem.bufferWriteStream лежит сегмент, тут мона его перенаправить в файлстрим, например
+        }
+    }
+    finally
+    {
+        await qItem.bufferWriteStream.DisposeAsync();
+    }
+};
+
+downloader.Start();
+```
+
+Или
 ```c#
 var segmentsDownloader = new SegmentsDownloader(httpClient, settings, channel);
 var downloadQueue = new DownloadQueue(TimeSpan.FromSeconds(10));
