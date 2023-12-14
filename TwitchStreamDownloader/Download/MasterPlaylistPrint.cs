@@ -8,16 +8,16 @@ public class MasterPlaylistPrint
     /// <summary>
     /// Когда время было взято. UTC
     /// </summary>
-    public readonly DateTime addedDate;
+    public DateTime AddedDate { get; }
     /// <summary>
     /// Само время
     /// </summary>
-    public readonly TimeSpan streamTime;
+    public TimeSpan StreamTime { get; }
 
     public MasterPlaylistPrint(DateTime addedDate, float streamTime)
     {
-        this.addedDate = addedDate;
-        this.streamTime = TimeSpan.FromSeconds(streamTime);
+        this.AddedDate = addedDate;
+        this.StreamTime = TimeSpan.FromSeconds(streamTime);
     }
 
     /// <summary>
@@ -25,7 +25,7 @@ public class MasterPlaylistPrint
     /// </summary>
     public DateTime GetEstimatedStreamStartTime()
     {
-        return addedDate - streamTime;
+        return AddedDate - StreamTime;
     }
 
     public TimeSpan GetEstimatedStreamLength()

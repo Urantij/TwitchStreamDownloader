@@ -73,7 +73,7 @@ public class StreamDownloader
 
     private async void SegmentArrived(object? sender, StreamSegment segment)
     {
-        if (!segment.IsLive && !DownloadAdvertisment)
+        if (!segment.IsLive() && !DownloadAdvertisment)
             return;
 
         QueueItem queueItem = DownloadQueue.Queue(segment, new MemoryStream());

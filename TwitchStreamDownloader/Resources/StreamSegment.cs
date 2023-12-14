@@ -4,26 +4,26 @@ namespace TwitchStreamDownloader.Resources;
 
 public class StreamSegment
 {
-    public readonly Uri uri;
-    public readonly string? title;
-    public readonly int mediaSequenceNumber;
+    public Uri Uri { get; }
+    public string? Title { get; }
+    public int MediaSequenceNumber { get; }
     /// <summary>
     /// Секунды
     /// </summary>
-    public readonly float duration;
-    public readonly DateTimeOffset programDate;
+    public float Duration { get; }
+    public DateTimeOffset ProgramDate { get; }
 
-    public readonly Quality quality;
+    public Quality Quality { get; }
 
     public StreamSegment(Uri uri, string? title, int mediaSequenceNumber, float duration, DateTimeOffset programDate, Quality quality)
     {
-        this.uri = uri;
-        this.title = title;
-        this.mediaSequenceNumber = mediaSequenceNumber;
-        this.duration = duration;
-        this.programDate = programDate;
-        this.quality = quality;
+        this.Uri = uri;
+        this.Title = title;
+        this.MediaSequenceNumber = mediaSequenceNumber;
+        this.Duration = duration;
+        this.ProgramDate = programDate;
+        this.Quality = quality;
     }
 
-    public bool IsLive => string.Equals(title, "live", StringComparison.OrdinalIgnoreCase);
+    public bool IsLive() => string.Equals(Title, "live", StringComparison.OrdinalIgnoreCase);
 }

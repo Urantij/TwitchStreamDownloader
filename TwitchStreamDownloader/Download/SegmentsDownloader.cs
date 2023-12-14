@@ -180,7 +180,7 @@ public class SegmentsDownloader : IDisposable
                 TokenAcquiringExceptionOccured?.Invoke(this, new TokenAcquiringExceptionEventArgs(e, tokenAcquiranceFailedAttempts));
 
                 bool shortDelay;
-                if (oauth != null && settings.oauthTokenFailedAttemptsLimit != -1 && tokenAcquiranceFailedAttempts >= settings.oauthTokenFailedAttemptsLimit)
+                if (oauth != null && settings.OauthTokenFailedAttemptsLimit != -1 && tokenAcquiranceFailedAttempts >= settings.OauthTokenFailedAttemptsLimit)
                 {
                     SetCreds(null, null);
 
@@ -194,7 +194,7 @@ public class SegmentsDownloader : IDisposable
                     shortDelay = tokenAcquiranceFailedAttempts == 1;
                 }
 
-                TimeSpan delay = shortDelay ? settings.shortAccessTokenRetryDelay : settings.accessTokenRetryDelay;
+                TimeSpan delay = shortDelay ? settings.ShortAccessTokenRetryDelay : settings.AccessTokenRetryDelay;
                 try { await Task.Delay(delay, cancellationToken); } catch { break; }
             }
         }
@@ -246,7 +246,7 @@ public class SegmentsDownloader : IDisposable
                 return;
         }
 
-        var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.fastBread, SessionId, random);
+        var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.FastBread, SessionId, random);
 
         _ = Task.Run(() => MasterLoopAsync(usherUri, cancellationToken), cancellationToken);
     }
@@ -264,10 +264,10 @@ public class SegmentsDownloader : IDisposable
                 {
                     var passed = DateTime.UtcNow - lastMasterPlaylistRequestDate.Value;
 
-                    if (passed < settings.masterPlaylistRetryDelay)
+                    if (passed < settings.MasterPlaylistRetryDelay)
                     {
-                        var toWait = settings.masterPlaylistRetryDelay - passed;
-                        try { await Task.Delay(settings.masterPlaylistRetryDelay, cancellationToken); } catch { return; }
+                        var toWait = settings.MasterPlaylistRetryDelay - passed;
+                        try { await Task.Delay(settings.MasterPlaylistRetryDelay, cancellationToken); } catch { return; }
                     }
                 }
 
@@ -330,7 +330,7 @@ public class SegmentsDownloader : IDisposable
             {
                 return;
             }
-            catch (BadCodeException e) when (e.statusCode == HttpStatusCode.Forbidden && settings.automaticallyUpdateAccessToken)
+            catch (BadCodeException e) when (e.statusCode == HttpStatusCode.Forbidden && settings.AutomaticallyUpdateAccessToken)
             {
                 OnMasterPlaylistException(e);
 
@@ -338,14 +338,14 @@ public class SegmentsDownloader : IDisposable
                 if (Access == null)
                     return;
 
-                usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.fastBread, SessionId, random);
+                usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.FastBread, SessionId, random);
             }
             catch (Exception e)
             {
                 OnMasterPlaylistException(e);
 
                 //непонятно зачем это теперь, ну да ладно
-                try { await Task.Delay(settings.masterPlaylistRetryDelay, cancellationToken); } catch { return; }
+                try { await Task.Delay(settings.MasterPlaylistRetryDelay, cancellationToken); } catch { return; }
             }
         }
     }
@@ -357,17 +357,17 @@ public class SegmentsDownloader : IDisposable
         if (LastStreamQuality != null)
         {
             // Есть аудиоонли, да
-            variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => ResolutionExtensions.Compare(s.streamInfTag.resolution, LastStreamQuality.resolution) && s.streamInfTag.frameRate == LastStreamQuality.fps);
+            variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => ResolutionExtensions.Compare(s.streamInfTag.resolution, LastStreamQuality.Resolution) && s.streamInfTag.frameRate == LastStreamQuality.Fps);
         }
 
-        if (variantStream == null && settings.preferredResolution != null)
+        if (variantStream == null && settings.PreferredResolution != null)
         {
-            VariantStream[] qualityStreams = masterPlaylist.variantStreams.Where(s => settings.preferredResolution.Same(s.streamInfTag.resolution))
+            VariantStream[] qualityStreams = masterPlaylist.variantStreams.Where(s => settings.PreferredResolution.Same(s.streamInfTag.resolution))
                                                                           .ToArray();
 
-            if (settings.preferredFps != null)
+            if (settings.PreferredFps != null)
             {
-                variantStream = qualityStreams.FirstOrDefault(s => s.streamInfTag.frameRate == settings.preferredFps);
+                variantStream = qualityStreams.FirstOrDefault(s => s.streamInfTag.frameRate == settings.PreferredFps);
 
                 variantStream ??= qualityStreams.FirstOrDefault();
             }
@@ -376,7 +376,7 @@ public class SegmentsDownloader : IDisposable
                 variantStream = qualityStreams.FirstOrDefault();
             }
 
-            if (variantStream == null && settings.takeOnlyPreferredQuality)
+            if (variantStream == null && settings.TakeOnlyPreferredQuality)
             {
                 var videos = masterPlaylist.variantStreams.Select(s => $"{s.streamInfTag.resolution} {s.streamInfTag.frameRate}").ToArray();
 
@@ -455,11 +455,11 @@ public class SegmentsDownloader : IDisposable
 
             int resultDuration = (int)(mediaPlaylist.mediaSegments.Sum(s => s.infTag.duration) / 2f * 1000);
 
-            if (resultDuration > settings.maxMediaPlaylistUpdateDelay.TotalMilliseconds)
-                resultDuration = (int)settings.maxMediaPlaylistUpdateDelay.TotalMilliseconds;
+            if (resultDuration > settings.MaxMediaPlaylistUpdateDelay.TotalMilliseconds)
+                resultDuration = (int)settings.MaxMediaPlaylistUpdateDelay.TotalMilliseconds;
 
-            if (resultDuration < settings.minMediaPlaylistUpdateDelay.TotalMilliseconds)
-                resultDuration = (int)settings.minMediaPlaylistUpdateDelay.TotalMilliseconds;
+            if (resultDuration < settings.MinMediaPlaylistUpdateDelay.TotalMilliseconds)
+                resultDuration = (int)settings.MinMediaPlaylistUpdateDelay.TotalMilliseconds;
 
             await Task.Delay(resultDuration, cancellationToken);
         }

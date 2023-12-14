@@ -42,7 +42,7 @@ public class DownloadQueue : IDisposable
         {
             using var downloadCts = new CancellationTokenSource(downloadTimeout);
 
-            await DownloadVideoAsync(httpClient, queueItem.segment.uri, queueItem.bufferWriteStream, downloadCts.Token);
+            await DownloadVideoAsync(httpClient, queueItem.segment.Uri, queueItem.bufferWriteStream, downloadCts.Token);
 
             queueItem.SetWritten();
         }
