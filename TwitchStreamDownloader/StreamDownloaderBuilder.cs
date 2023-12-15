@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using TwitchStreamDownloader.Download;
 
 namespace TwitchStreamDownloader;
@@ -17,6 +18,7 @@ public class StreamDownloaderBuilder
 
     TimeSpan? downloadTimeout;
 
+    ILogger? logger;
     HttpClient? httpClient;
 
     public StreamDownloaderBuilder(string channel)
@@ -50,6 +52,13 @@ public class StreamDownloaderBuilder
         return this;
     }
 
+    public StreamDownloaderBuilder WithLogger(ILogger? logger)
+    {
+        this.logger = logger;
+
+        return this;
+    }
+
     public StreamDownloaderBuilder WithHttpClient(HttpClient client)
     {
         this.httpClient = client;
@@ -69,6 +78,6 @@ public class StreamDownloaderBuilder
             UseProxy = false
         });
 
-        return new StreamDownloader(channel, settings, clientId, oauth, downloadTimeout.Value, httpClient);
+        return new StreamDownloader(channel, settings, clientId, oauth, downloadTimeout.Value, httpClient, logger);
     }
 }

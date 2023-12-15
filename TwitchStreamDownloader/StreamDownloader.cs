@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using TwitchStreamDownloader.Download;
 using TwitchStreamDownloader.Net;
 using TwitchStreamDownloader.Queues;
@@ -17,6 +18,7 @@ public class StreamDownloader
     public event Action<QueueItem, Exception>? SegmentDownloadExceptionOccured;
 
     readonly HttpClient httpClient;
+    readonly ILogger? logger;
 
     /// <summary>
     /// По умолчанию false.
@@ -31,8 +33,9 @@ public class StreamDownloader
 
     public bool Working { get; private set; }
 
-    public StreamDownloader(string channel, SegmentsDownloaderSettings segmentsDownloaderSettings, string? clientId, string? oauth, TimeSpan downloadQueueTimeout, HttpClient httpClient)
+    public StreamDownloader(string channel, SegmentsDownloaderSettings segmentsDownloaderSettings, string? clientId, string? oauth, TimeSpan downloadQueueTimeout, HttpClient httpClient, ILogger? logger)
     {
+        this.logger = logger;
         this.httpClient = httpClient;
 
         SegmentsDownloader = new SegmentsDownloader(httpClient, segmentsDownloaderSettings, channel, clientId, oauth);
@@ -45,7 +48,12 @@ public class StreamDownloader
     public void Start()
     {
         if (Working)
+        {
+            logger?.LogWarning("Попытка запуска, когда загрузчик уже запущен.");
             return;
+        }
+
+        logger?.LogDebug("Запуск.");
 
         Working = true;
 
@@ -55,7 +63,12 @@ public class StreamDownloader
     public void Suspend()
     {
         if (!Working)
+        {
+            logger?.LogWarning("Попытка остановки, когда загрузчик уже остановлен.");
             return;
+        }
+
+        logger?.LogDebug("Остановка.");
 
         Working = false;
 
@@ -111,6 +124,7 @@ public class StreamDownloader
                 if (downloader.Disposed || !Working)
                     return;
 
+                logger?.LogInformation("Сброс токена...");
                 downloader.DropToken();
             });
         }
