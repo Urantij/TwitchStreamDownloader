@@ -44,6 +44,9 @@ public class StreamDownloader
 
     public void Start()
     {
+        if (Working)
+            return;
+
         Working = true;
 
         SegmentsDownloader.Start();
@@ -51,16 +54,12 @@ public class StreamDownloader
 
     public void Suspend()
     {
+        if (!Working)
+            return;
+
         Working = false;
 
         SegmentsDownloader.Stop();
-    }
-
-    public void Resume()
-    {
-        Working = true;
-
-        SegmentsDownloader.Start();
     }
 
     public void Close()
