@@ -26,7 +26,7 @@ public class StreamDownloaderBuilder
         this.channel = channel;
     }
 
-    public StreamDownloaderBuilder WithSettings(SegmentsDownloaderSettings settings)
+    public StreamDownloaderBuilder WithSettings(SegmentsDownloaderSettings? settings)
     {
         this.settings = settings;
         return this;
@@ -37,7 +37,7 @@ public class StreamDownloaderBuilder
     /// </summary>
     /// <param name="timeout"></param>
     /// <returns></returns>
-    public StreamDownloaderBuilder WithDownloadTimeout(TimeSpan timeout)
+    public StreamDownloaderBuilder WithDownloadTimeout(TimeSpan? timeout)
     {
         this.downloadTimeout = timeout;
 
@@ -59,7 +59,7 @@ public class StreamDownloaderBuilder
         return this;
     }
 
-    public StreamDownloaderBuilder WithHttpClient(HttpClient client)
+    public StreamDownloaderBuilder WithHttpClient(HttpClient? client)
     {
         this.httpClient = client;
 
