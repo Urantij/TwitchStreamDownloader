@@ -59,12 +59,14 @@ public class SegmentsDownloader : IDisposable
     /// програмдейт последнего сегмента
     /// </summary>
     public DateTimeOffset? LastMediaTime { get; private set; } = null;
+
     /// <summary>
     /// Последний номер в текущей загрузки. Если mediaplaylist сменился, становится null
     /// </summary>
     public int? LastMediaSequenceNumber { get; private set; } = null;
 
     public MasterPlaylistPrint? LastMasterPlaylistPrint { get; private set; }
+
     /// <summary>
     /// UTC
     /// </summary>
@@ -78,6 +80,7 @@ public class SegmentsDownloader : IDisposable
     public string SessionId { get; private set; }
 
     public readonly HttpClient httpClient;
+
     /// <summary>
     /// Токен отмены текущего круга загрузки сегментов
     /// </summary>
@@ -93,14 +96,17 @@ public class SegmentsDownloader : IDisposable
     public event EventHandler? PlaylistEnded;
     public event EventHandler<Exception>? MasterPlaylistExceptionOccured;
     public event EventHandler<Exception>? MediaPlaylistExceptionOccured;
+
     /// <summary>
     /// <see cref="LastStreamQuality"/> содержит предыдущее качество
     /// </summary>
     public event EventHandler<MediaQualitySelectedEventArgs>? MediaQualitySelected;
+
     /// <summary>
     /// Сюда прибывают сегменты
     /// </summary>
     public event EventHandler<StreamSegment>? SegmentArrived;
+
     public event EventHandler? MediaPlaylistProcessed;
     public event EventHandler<LineEventArgs>? UnknownPlaylistLineFound;
     public event EventHandler<LineEventArgs>? CommentPlaylistLineFound;
@@ -123,7 +129,8 @@ public class SegmentsDownloader : IDisposable
     /// <param name="channel"></param>
     /// <param name="clientId"></param>
     /// <param name="oauth"></param>
-    public SegmentsDownloader(HttpClient httpClient, SegmentsDownloaderSettings settings, string channel, string? clientId, string? oauth)
+    public SegmentsDownloader(HttpClient httpClient, SegmentsDownloaderSettings settings, string channel,
+        string? clientId, string? oauth)
     {
         this.settings = settings;
         this.channel = channel;
@@ -155,7 +162,8 @@ public class SegmentsDownloader : IDisposable
         string requestClientId = clientId ?? "kimne78kx3ncx6brgo4mv6wki5h1ko";
         string requestOauth = oauth ?? undefined;
 
-        return await GqlNet.GetAccessToken(httpClient, channel, requestClientId, DeviceId, requestOauth, cancellationToken);
+        return await GqlNet.GetAccessToken(httpClient, channel, requestClientId, DeviceId, requestOauth,
+            cancellationToken);
     }
 
     /// <summary>
@@ -177,10 +185,12 @@ public class SegmentsDownloader : IDisposable
             {
                 tokenAcquiranceFailedAttempts++;
 
-                TokenAcquiringExceptionOccured?.Invoke(this, new TokenAcquiringExceptionEventArgs(e, tokenAcquiranceFailedAttempts));
+                TokenAcquiringExceptionOccured?.Invoke(this,
+                    new TokenAcquiringExceptionEventArgs(e, tokenAcquiranceFailedAttempts));
 
                 bool shortDelay;
-                if (oauth != null && settings.OauthTokenFailedAttemptsLimit != -1 && tokenAcquiranceFailedAttempts >= settings.OauthTokenFailedAttemptsLimit)
+                if (oauth != null && settings.OauthTokenFailedAttemptsLimit != -1 &&
+                    tokenAcquiranceFailedAttempts >= settings.OauthTokenFailedAttemptsLimit)
                 {
                     SetCreds(null, null);
 
@@ -195,7 +205,14 @@ public class SegmentsDownloader : IDisposable
                 }
 
                 TimeSpan delay = shortDelay ? settings.ShortAccessTokenRetryDelay : settings.AccessTokenRetryDelay;
-                try { await Task.Delay(delay, cancellationToken); } catch { break; }
+                try
+                {
+                    await Task.Delay(delay, cancellationToken);
+                }
+                catch
+                {
+                    break;
+                }
             }
         }
 
@@ -228,7 +245,13 @@ public class SegmentsDownloader : IDisposable
         if (cancellationTokenSourceLoop != null && !cancellationTokenSourceLoop.IsCancellationRequested)
         {
             cancellationTokenSourceLoop.Cancel();
-            try { cancellationTokenSourceLoop.Dispose(); } catch { }
+            try
+            {
+                cancellationTokenSourceLoop.Dispose();
+            }
+            catch
+            {
+            }
         }
         else
         {
@@ -246,7 +269,8 @@ public class SegmentsDownloader : IDisposable
                 return;
         }
 
-        var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.FastBread, SessionId, random);
+        var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.FastBread, SessionId,
+            random);
 
         _ = Task.Run(() => MasterLoopAsync(usherUri, cancellationToken), cancellationToken);
     }
@@ -267,16 +291,25 @@ public class SegmentsDownloader : IDisposable
                     if (passed < settings.MasterPlaylistRetryDelay)
                     {
                         var toWait = settings.MasterPlaylistRetryDelay - passed;
-                        try { await Task.Delay(settings.MasterPlaylistRetryDelay, cancellationToken); } catch { return; }
+                        try
+                        {
+                            await Task.Delay(settings.MasterPlaylistRetryDelay, cancellationToken);
+                        }
+                        catch
+                        {
+                            return;
+                        }
                     }
                 }
 
                 string responseContent;
                 using (var requestMessage = new HttpRequestMessage(HttpMethod.Get, usherUri))
                 {
-                    requestMessage.Headers.Add("Accept", "application/x-mpegURL, application/vnd.apple.mpegurl, application/json, text/plain");
+                    requestMessage.Headers.Add("Accept",
+                        "application/x-mpegURL, application/vnd.apple.mpegurl, application/json, text/plain");
 
-                    using var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationToken);
+                    using var response = await httpClient.SendAsync(requestMessage,
+                        HttpCompletionOption.ResponseContentRead, cancellationToken);
                     responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
 
                     if (response.StatusCode != HttpStatusCode.OK)
@@ -284,6 +317,7 @@ public class SegmentsDownloader : IDisposable
                         throw new BadCodeException(response.StatusCode, responseContent);
                     }
                 }
+
                 lastMasterPlaylistRequestDate = DateTime.UtcNow;
 
                 MasterParser parser = new();
@@ -292,7 +326,9 @@ public class SegmentsDownloader : IDisposable
 
                 MasterPlaylist playlist = parser.Parse(responseContent);
 
-                var twitchInfoTagInfo = playlist.globalTags.First(t => string.Equals(t.tag, "#EXT-X-TWITCH-INFO", StringComparison.Ordinal) /*t.tag == "#EXT-X-TWITCH-INFO"*/);
+                var twitchInfoTagInfo = playlist.globalTags.First(
+                    t => string.Equals(t.tag, "#EXT-X-TWITCH-INFO",
+                        StringComparison.Ordinal) /*t.tag == "#EXT-X-TWITCH-INFO"*/);
                 var twitchInfoTag = new XTwitchInfoTag(twitchInfoTagInfo.value!);
 
                 LastMasterPlaylistPrint = new MasterPlaylistPrint(DateTime.UtcNow, twitchInfoTag.streamTime);
@@ -310,7 +346,15 @@ public class SegmentsDownloader : IDisposable
                     //Вообще на той стороне человечек должен дёрнуть рубильник, но мало ли
                     OnMediaPlaylistException(e);
 
-                    try { await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken); } catch { return; }
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
+                    }
+                    catch
+                    {
+                        return;
+                    }
+
                     continue;
                 }
                 catch (Exception e)
@@ -330,7 +374,8 @@ public class SegmentsDownloader : IDisposable
             {
                 return;
             }
-            catch (BadCodeException e) when (e.statusCode == HttpStatusCode.Forbidden && settings.AutomaticallyUpdateAccessToken)
+            catch (BadCodeException e) when (e.statusCode == HttpStatusCode.Forbidden &&
+                                             settings.AutomaticallyUpdateAccessToken)
             {
                 OnMasterPlaylistException(e);
 
@@ -338,14 +383,22 @@ public class SegmentsDownloader : IDisposable
                 if (Access == null)
                     return;
 
-                usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.FastBread, SessionId, random);
+                usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.FastBread,
+                    SessionId, random);
             }
             catch (Exception e)
             {
                 OnMasterPlaylistException(e);
 
                 //непонятно зачем это теперь, ну да ладно
-                try { await Task.Delay(settings.MasterPlaylistRetryDelay, cancellationToken); } catch { return; }
+                try
+                {
+                    await Task.Delay(settings.MasterPlaylistRetryDelay, cancellationToken);
+                }
+                catch
+                {
+                    return;
+                }
             }
         }
     }
@@ -357,13 +410,16 @@ public class SegmentsDownloader : IDisposable
         if (LastStreamQuality != null)
         {
             // Есть аудиоонли, да
-            variantStream = masterPlaylist.variantStreams.FirstOrDefault(s => ResolutionExtensions.Compare(s.streamInfTag.resolution, LastStreamQuality.Resolution) && s.streamInfTag.frameRate == LastStreamQuality.Fps);
+            variantStream = masterPlaylist.variantStreams.FirstOrDefault(s =>
+                ResolutionExtensions.Compare(s.streamInfTag.resolution, LastStreamQuality.Resolution) &&
+                s.streamInfTag.frameRate == LastStreamQuality.Fps);
         }
 
         if (variantStream == null && settings.PreferredResolution != null)
         {
-            VariantStream[] qualityStreams = masterPlaylist.variantStreams.Where(s => settings.PreferredResolution.Same(s.streamInfTag.resolution))
-                                                                          .ToArray();
+            VariantStream[] qualityStreams = masterPlaylist.variantStreams
+                .Where(s => settings.PreferredResolution.Same(s.streamInfTag.resolution))
+                .ToArray();
 
             if (settings.PreferredFps != null)
             {
@@ -378,7 +434,8 @@ public class SegmentsDownloader : IDisposable
 
             if (variantStream == null && settings.TakeOnlyPreferredQuality)
             {
-                var videos = masterPlaylist.variantStreams.Select(s => $"{s.streamInfTag.resolution} {s.streamInfTag.frameRate}").ToArray();
+                var videos = masterPlaylist.variantStreams
+                    .Select(s => $"{s.streamInfTag.resolution} {s.streamInfTag.frameRate}").ToArray();
 
                 throw new NoQualityException(videos);
             }
@@ -397,7 +454,8 @@ public class SegmentsDownloader : IDisposable
             string responseContent;
             using (var requestMessage = new HttpRequestMessage(HttpMethod.Get, variantStream.uri))
             {
-                using HttpResponseMessage responseMessage = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationToken);
+                using HttpResponseMessage responseMessage = await httpClient.SendAsync(requestMessage,
+                    HttpCompletionOption.ResponseContentRead, cancellationToken);
                 responseContent = await responseMessage.Content.ReadAsStringAsync(cancellationToken);
 
                 if (responseMessage.StatusCode != HttpStatusCode.OK)
@@ -435,8 +493,11 @@ public class SegmentsDownloader : IDisposable
                 LastMediaTime = mediaSegment.programDateTag.time;
                 LastMediaSequenceNumber = currentMediaSequenceNumber;
 
+                TagInfo? mapTag = mediaSegment.unAddedTags.FirstOrDefault(t => t.tag == "#EXT-X-MAP");
+
                 //title вроде всегда есть
-                StreamSegment segmentInfo = new(mediaSegment.uri, mediaSegment.infTag.title, currentMediaSequenceNumber, mediaSegment.infTag.duration, mediaSegment.programDateTag.time, LastStreamQuality);
+                StreamSegment segmentInfo = new(mediaSegment.uri, mediaSegment.infTag.title, currentMediaSequenceNumber,
+                    mediaSegment.infTag.duration, mediaSegment.programDateTag.time, LastStreamQuality, mapTag?.value);
 
                 OnSegmentArrived(segmentInfo);
 
@@ -479,6 +540,7 @@ public class SegmentsDownloader : IDisposable
     }
 
     #region Events
+
     private void OnPlaylistEnded()
     {
         PlaylistEnded?.Invoke(this, EventArgs.Empty);
@@ -523,6 +585,7 @@ public class SegmentsDownloader : IDisposable
     {
         TokenAcquired?.Invoke(this, accessToken);
     }
+
     #endregion
 
     public void Dispose()
@@ -534,7 +597,13 @@ public class SegmentsDownloader : IDisposable
 
         if (cancellationTokenSourceLoop != null)
         {
-            try { cancellationTokenSourceLoop.Cancel(); } catch { }
+            try
+            {
+                cancellationTokenSourceLoop.Cancel();
+            }
+            catch
+            {
+            }
 
             cancellationTokenSourceLoop.Dispose();
         }
