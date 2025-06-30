@@ -14,7 +14,7 @@ public static class ResolutionExtensions
         if (resolution == null)
             return false;
 
-        return thisResolution.width == resolution.width && thisResolution.height == resolution.height;
+        return thisResolution.Width == resolution.Width && thisResolution.Height == resolution.Height;
     }
 
     public static bool Compare(Resolution? resolution1, Resolution? resolution2)

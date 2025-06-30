@@ -326,12 +326,12 @@ public class SegmentsDownloader : IDisposable
 
                 MasterPlaylist playlist = parser.Parse(responseContent);
 
-                var twitchInfoTagInfo = playlist.globalTags.First(
-                    t => string.Equals(t.tag, "#EXT-X-TWITCH-INFO",
+                var twitchInfoTagInfo = playlist.GlobalTags.First(
+                    t => string.Equals(t.Tag, "#EXT-X-TWITCH-INFO",
                         StringComparison.Ordinal) /*t.tag == "#EXT-X-TWITCH-INFO"*/);
-                var twitchInfoTag = new XTwitchInfoTag(twitchInfoTagInfo.value!);
+                var twitchInfoTag = new XTwitchInfoTag(twitchInfoTagInfo.Value!);
 
-                LastMasterPlaylistPrint = new MasterPlaylistPrint(DateTime.UtcNow, twitchInfoTag.streamTime);
+                LastMasterPlaylistPrint = new MasterPlaylistPrint(DateTime.UtcNow, twitchInfoTag.StreamTime);
 
                 try
                 {
@@ -410,20 +410,20 @@ public class SegmentsDownloader : IDisposable
         if (LastStreamQuality != null)
         {
             // Есть аудиоонли, да
-            variantStream = masterPlaylist.variantStreams.FirstOrDefault(s =>
-                ResolutionExtensions.Compare(s.streamInfTag.resolution, LastStreamQuality.Resolution) &&
-                s.streamInfTag.frameRate == LastStreamQuality.Fps);
+            variantStream = masterPlaylist.VariantStreams.FirstOrDefault(s =>
+                ResolutionExtensions.Compare(s.StreamInfTag.Resolution, LastStreamQuality.Resolution) &&
+                s.StreamInfTag.FrameRate == LastStreamQuality.Fps);
         }
 
         if (variantStream == null && settings.PreferredResolution != null)
         {
-            VariantStream[] qualityStreams = masterPlaylist.variantStreams
-                .Where(s => settings.PreferredResolution.Same(s.streamInfTag.resolution))
+            VariantStream[] qualityStreams = masterPlaylist.VariantStreams
+                .Where(s => settings.PreferredResolution.Same(s.StreamInfTag.Resolution))
                 .ToArray();
 
             if (settings.PreferredFps != null)
             {
-                variantStream = qualityStreams.FirstOrDefault(s => s.streamInfTag.frameRate == settings.PreferredFps);
+                variantStream = qualityStreams.FirstOrDefault(s => s.StreamInfTag.FrameRate == settings.PreferredFps);
 
                 variantStream ??= qualityStreams.FirstOrDefault();
             }
@@ -434,17 +434,17 @@ public class SegmentsDownloader : IDisposable
 
             if (variantStream == null && settings.TakeOnlyPreferredQuality)
             {
-                var videos = masterPlaylist.variantStreams
-                    .Select(s => $"{s.streamInfTag.resolution} {s.streamInfTag.frameRate}").ToArray();
+                var videos = masterPlaylist.VariantStreams
+                    .Select(s => $"{s.StreamInfTag.Resolution} {s.StreamInfTag.FrameRate}").ToArray();
 
                 throw new NoQualityException(videos);
             }
         }
 
-        variantStream ??= masterPlaylist.variantStreams.First();
+        variantStream ??= masterPlaylist.VariantStreams.First();
 
         // Ну они вроде всегда есть.
-        var quality = new Quality(variantStream.streamInfTag.resolution, variantStream.streamInfTag.frameRate!.Value);
+        var quality = new Quality(variantStream.StreamInfTag.Resolution, variantStream.StreamInfTag.FrameRate!.Value);
 
         OnMediaQualitySelected(variantStream, quality);
         LastStreamQuality = quality;
@@ -452,7 +452,7 @@ public class SegmentsDownloader : IDisposable
         while (!Disposed && !cancellationToken.IsCancellationRequested)
         {
             string responseContent;
-            using (var requestMessage = new HttpRequestMessage(HttpMethod.Get, variantStream.uri))
+            using (var requestMessage = new HttpRequestMessage(HttpMethod.Get, variantStream.Uri))
             {
                 using HttpResponseMessage responseMessage = await httpClient.SendAsync(requestMessage,
                     HttpCompletionOption.ResponseContentRead, cancellationToken);
@@ -472,32 +472,32 @@ public class SegmentsDownloader : IDisposable
 
             LastMediaPlaylistUpdate = DateTime.UtcNow;
 
-            int firstMediaSequenceNumber = mediaPlaylist.mediaSequenceTag?.mediaSequenceNumber ?? 0;
+            int firstMediaSequenceNumber = mediaPlaylist.MediaSequenceTag?.MediaSequenceNumber ?? 0;
 
-            for (int index = 0; index < mediaPlaylist.mediaSegments.Count; index++)
+            for (int index = 0; index < mediaPlaylist.MediaSegments.Count; index++)
             {
                 int currentMediaSequenceNumber = firstMediaSequenceNumber + index;
 
-                MediaSegment mediaSegment = mediaPlaylist.mediaSegments[index];
+                MediaSegment mediaSegment = mediaPlaylist.MediaSegments[index];
 
                 /* такое возможно, если выбран режим быстрого хлеба
                  * впадлу думать. TODO подумать. можно качать эти сегменты, и если потом они находятся иным путём... или если вместо них приходит реклама... */
-                if (mediaSegment.programDateTag == null)
+                if (mediaSegment.ProgramDateTag == null)
                 {
                     continue;
                 }
 
-                if (LastMediaTime >= mediaSegment.programDateTag.time) continue;
+                if (LastMediaTime >= mediaSegment.ProgramDateTag.Time) continue;
                 if (currentMediaSequenceNumber <= LastMediaSequenceNumber) continue;
 
-                LastMediaTime = mediaSegment.programDateTag.time;
+                LastMediaTime = mediaSegment.ProgramDateTag.Time;
                 LastMediaSequenceNumber = currentMediaSequenceNumber;
 
-                TagInfo? mapTag = mediaSegment.unAddedTags.FirstOrDefault(t => t.tag == "#EXT-X-MAP");
+                TagInfo? mapTag = mediaSegment.UnAddedTags.FirstOrDefault(t => t.Tag == "#EXT-X-MAP");
 
                 //title вроде всегда есть
-                StreamSegment segmentInfo = new(mediaSegment.uri, mediaSegment.infTag.title, currentMediaSequenceNumber,
-                    mediaSegment.infTag.duration, mediaSegment.programDateTag.time, LastStreamQuality, mapTag?.value);
+                StreamSegment segmentInfo = new(mediaSegment.Uri, mediaSegment.InfTag.Title, currentMediaSequenceNumber,
+                    mediaSegment.InfTag.Duration, mediaSegment.ProgramDateTag.Time, LastStreamQuality, mapTag?.Value);
 
                 OnSegmentArrived(segmentInfo);
 
@@ -509,12 +509,12 @@ public class SegmentsDownloader : IDisposable
 
             OnMediaPlaylistProcessed();
 
-            if (mediaPlaylist.endList)
+            if (mediaPlaylist.EndList)
             {
                 return;
             }
 
-            int resultDuration = (int)(mediaPlaylist.mediaSegments.Sum(s => s.infTag.duration) / 2f * 1000);
+            int resultDuration = (int)(mediaPlaylist.MediaSegments.Sum(s => s.InfTag.Duration) / 2f * 1000);
 
             if (resultDuration > settings.MaxMediaPlaylistUpdateDelay.TotalMilliseconds)
                 resultDuration = (int)settings.MaxMediaPlaylistUpdateDelay.TotalMilliseconds;
