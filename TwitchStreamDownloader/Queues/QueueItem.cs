@@ -4,14 +4,14 @@ namespace TwitchStreamDownloader.Queues;
 
 public class QueueItem
 {
-    public readonly StreamSegment segment;
+    public StreamSegment Segment { get; }
 
     /// <summary>
-    /// Загрузка будет происходит сразу, а не в порядке очереди, если чо.
+    /// Загрузка будет происходить сразу, а не в порядке очереди, если чо.
     /// Так что копировать нужно в какой-то буфер.
     /// А потом из буфера куда надо, когда очередь подойдёт.
     /// </summary>
-    public readonly Stream bufferWriteStream;
+    public Stream BufferWriteStream { get; }
 
     /// <summary>
     /// Произошла ли запись в буффер.
@@ -21,12 +21,12 @@ public class QueueItem
 
     public Task DownloadTask => tcs.Task;
 
-    readonly TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public QueueItem(StreamSegment segment, Stream bufferWriteStream)
     {
-        this.segment = segment;
-        this.bufferWriteStream = bufferWriteStream;
+        this.Segment = segment;
+        this.BufferWriteStream = bufferWriteStream;
     }
 
     public void SetWritten()

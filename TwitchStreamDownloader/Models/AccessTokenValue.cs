@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TwitchStreamDownloader.Models;
 
 /// <summary>
@@ -6,86 +8,126 @@ namespace TwitchStreamDownloader.Models;
 /// </summary>
 public class AccessTokenValue
 {
-    public class Authorization
+    public class AuthorizationData(bool? forbidden, string? reason)
     {
-        public bool? forbidden;
-        public string? reason;
+        [JsonPropertyName("forbidden")] public bool? Forbidden { get; } = forbidden;
+        [JsonPropertyName("reason")] public string? Reason { get; } = reason;
     }
 
-    public class Private
+    public class PrivateData(bool? allowedToView)
     {
-        public bool? allowed_to_view;
+        [JsonPropertyName("allowed_to_view")] public bool? AllowedToView { get; } = allowedToView;
     }
 
-    public bool? adblock;
+    public AccessTokenValue(bool? adblock, AuthorizationData? authorization, bool? blackoutEnabled, string? channel,
+        string? channelId, string? geoblockReason, string? deviceId, long? expires, bool? extendedHistoryAllowed,
+        bool? hideAds, bool? httpsRequired, bool? mature, bool? partner, string? platform,
+        string? playerType, PrivateData? @private, bool? privileged, string? role, bool? serverAds, bool? showAds,
+        bool? subscriber, bool? turbo, ulong? userId, string? userIp, int? version)
+    {
+        Adblock = adblock;
+        Authorization = authorization;
+        BlackoutEnabled = blackoutEnabled;
+        Channel = channel;
+        ChannelId = channelId;
+        GeoblockReason = geoblockReason;
+        DeviceId = deviceId;
+        Expires = expires;
+        ExtendedHistoryAllowed = extendedHistoryAllowed;
+        HideAds = hideAds;
+        HttpsRequired = httpsRequired;
+        Mature = mature;
+        Partner = partner;
+        Platform = platform;
+        PlayerType = playerType;
+        Private = @private;
+        Privileged = privileged;
+        Role = role;
+        ServerAds = serverAds;
+        ShowAds = showAds;
+        Subscriber = subscriber;
+        Turbo = turbo;
+        UserId = userId;
+        UserIp = userIp;
+        Version = version;
+    }
+
+    [JsonPropertyName("adblock")] public bool? Adblock { get; }
 
     /// <summary>
     /// формиден фолс было бы неплохо
     /// </summary>
-    public Authorization? authorization;
+    [JsonPropertyName("authorization")]
+    public AuthorizationData? Authorization { get; }
 
-    public bool? blackout_enabled;
+    [JsonPropertyName("blackout_enabled")] public bool? BlackoutEnabled { get; }
 
-    public string? channel;
+    [JsonPropertyName("channel")] public string? Channel { get; }
 
-    public string? channel_id;
+    [JsonPropertyName("channel_id")] public string? ChannelId { get; }
 
     //впадлу
     //chansub
 
-    public string? geoblock_reason;
+    [JsonPropertyName("geoblock_reason")] public string? GeoblockReason { get; }
 
-    public string? device_id;
+    [JsonPropertyName("device_id")] public string? DeviceId { get; }
 
     /// <summary>
     /// DateTimeOffset.FromUnixTimeSeconds
     /// </summary>
-    public long? expires;
+    [JsonPropertyName("expires")]
+    public long? Expires { get; }
 
-    public bool? extended_history_allowed;
+    [JsonPropertyName("extended_history_allowed")]
+    public bool? ExtendedHistoryAllowed { get; }
 
     //почему то пустая была
     //впадлу
-    //public string? game;
+    //[JsonPropertyName("game")]
+    // public string? Game { get; }
 
-    public bool? hide_ads;
+    [JsonPropertyName("hide_ads")] public bool? HideAds { get; }
 
-    public bool? https_required;
+    [JsonPropertyName("https_required")] public bool? HttpsRequired { get; }
 
-    public bool? mature;
+    [JsonPropertyName("mature")] public bool? Mature { get; }
 
-    public bool? partner;
+    [JsonPropertyName("partner")] public bool? Partner { get; }
 
     /// <summary>
     /// В браузере было "web"
     /// </summary>
-    public string? platform;
+    [JsonPropertyName("platform")]
+    public string? Platform { get; }
 
     /// <summary>
     /// В браузере было "site"
     /// </summary>
-    public string? player_type;
+    [JsonPropertyName("player_type")]
+    public string? PlayerType { get; }
 
-    public Private? @private;
+    [JsonPropertyName("private")] public PrivateData? Private { get; }
 
-    public bool? privileged;
+    [JsonPropertyName("privileged")] public bool? Privileged { get; }
 
     /// <summary>
     /// Пустая
     /// </summary>
-    public string? role;
+    [JsonPropertyName("role")]
+    public string? Role { get; }
 
-    public bool? server_ads;
+    [JsonPropertyName("server_ads")] public bool? ServerAds { get; }
 
-    public bool? show_ads;
+    [JsonPropertyName("show_ads")] public bool? ShowAds { get; }
 
-    public bool? subscriber;
+    [JsonPropertyName("subscriber")] public bool? Subscriber { get; }
 
-    public bool? turbo;
+    [JsonPropertyName("turbo")] public bool? Turbo { get; }
 
-    public ulong? user_id;
+    [JsonPropertyName("user_id")] public ulong? UserId { get; }
 
-    public string? user_ip;
+    [JsonPropertyName("user_ip")] public string? UserIp { get; }
 
-    public int? version;
+    [JsonPropertyName("version")] public int? Version { get; }
 }

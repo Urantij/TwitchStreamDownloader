@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using TwitchStreamDownloader.Download;
 using TwitchStreamDownloader.Net;
@@ -33,7 +29,8 @@ public class StreamDownloader
 
     public bool Working { get; private set; }
 
-    public StreamDownloader(string channel, SegmentsDownloaderSettings segmentsDownloaderSettings, string? clientId, string? oauth, TimeSpan downloadQueueTimeout, HttpClient httpClient, ILogger? logger)
+    public StreamDownloader(string channel, SegmentsDownloaderSettings segmentsDownloaderSettings, string? clientId,
+        string? oauth, TimeSpan downloadQueueTimeout, HttpClient httpClient, ILogger? logger)
     {
         this.logger = logger;
         this.httpClient = httpClient;
@@ -103,10 +100,10 @@ public class StreamDownloader
     {
         var downloader = (SegmentsDownloader)sender!;
 
-        if (e.parsedValue.expires == null)
+        if (e.ParsedValue.Expires == null)
             return;
 
-        var left = DateTimeOffset.FromUnixTimeSeconds(e.parsedValue.expires.Value) - DateTimeOffset.UtcNow;
+        var left = DateTimeOffset.FromUnixTimeSeconds(e.ParsedValue.Expires.Value) - DateTimeOffset.UtcNow;
 
         if (DownloaderForceTokenChange)
         {

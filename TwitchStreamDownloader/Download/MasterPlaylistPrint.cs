@@ -9,6 +9,7 @@ public class MasterPlaylistPrint
     /// Когда время было взято. UTC
     /// </summary>
     public DateTime AddedDate { get; }
+
     /// <summary>
     /// Само время
     /// </summary>

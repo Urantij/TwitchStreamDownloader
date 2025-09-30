@@ -1,25 +1,21 @@
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
-#nullable disable warnings
 namespace TwitchStreamDownloader.Models;
 
-internal class PlaybackAccessTokenResponseBody
+internal class PlaybackAccessTokenResponseBody(PlaybackAccessTokenResponseBody.TokenData data)
 {
-    public class Data
+    public class TokenData(TokenData.StreamPlaybackAccessTokenData streamPlaybackAccessToken)
     {
-        public class StreamPlaybackAccessToken
+        public class StreamPlaybackAccessTokenData(string value, string signature)
         {
-            [JsonRequired]
-            public string value;
-            [JsonRequired]
-            public string signature;
+            [JsonPropertyName("value")] public string Value { get; } = value;
+
+            [JsonPropertyName("signature")] public string Signature { get; } = signature;
         }
 
-        [JsonRequired]
-        public StreamPlaybackAccessToken streamPlaybackAccessToken;
+        [JsonPropertyName("streamPlaybackAccessToken")]
+        public StreamPlaybackAccessTokenData StreamPlaybackAccessToken { get; } = streamPlaybackAccessToken;
     }
 
-    [JsonRequired]
-    public Data data;
+    [JsonPropertyName("data")] public TokenData Data { get; } = data;
 }
-#nullable restore warnings

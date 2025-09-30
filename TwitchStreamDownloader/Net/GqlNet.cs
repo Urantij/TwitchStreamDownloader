@@ -1,24 +1,16 @@
-using System;
 using System.Net;
 using System.Text;
-using Newtonsoft.Json;
+using System.Text.Json;
 using TwitchStreamDownloader.Exceptions;
 using TwitchStreamDownloader.Models;
 
 namespace TwitchStreamDownloader.Net;
 
-public class AccessToken
+public class AccessToken(string value, AccessTokenValue parsedValue, string signature)
 {
-    public readonly string value;
-    public readonly AccessTokenValue parsedValue;
-    public readonly string signature;
-
-    public AccessToken(string value, AccessTokenValue parsedValue, string signature)
-    {
-        this.value = value;
-        this.parsedValue = parsedValue;
-        this.signature = signature;
-    }
+    public string Value { get; } = value;
+    public AccessTokenValue ParsedValue { get; } = parsedValue;
+    public string Signature { get; } = signature;
 }
 
 public static class GqlNet
@@ -26,7 +18,8 @@ public static class GqlNet
     /// <exception cref="BadCodeException">Если хттп код не саксес.</exception>
     /// <exception cref="Exception">Скорее всего, не удалось совершить запрос.</exception>
     /// <exception cref="WrongContentException">Если содержимое ответа не такое, какое хотелось бы.</exception>
-    internal static async Task<AccessToken> GetAccessToken(HttpClient client, string channel, string clientId, string deviceId, string oauth, CancellationToken cancellationToken)
+    internal static async Task<AccessToken> GetAccessToken(HttpClient client, string channel, string clientId,
+        string deviceId, string oauth, CancellationToken cancellationToken)
     {
         const string query = @"query(
                 $login: String!
@@ -58,26 +51,21 @@ public static class GqlNet
 
         try
         {
-            var parsed = JsonConvert.DeserializeAnonymousType(responseContent, new
-            {
-                data = new
-                {
-                    streamPlaybackAccessToken = new
-                    {
-                        value = "",
-                        signature = ""
-                    }
-                }
-            });
+            PlaybackAccessTokenResponseBody? parsed =
+                JsonSerializer.Deserialize<PlaybackAccessTokenResponseBody>(responseContent);
 
             //вроде оно просто кидает ошибку, если не может, ну да ладно
             if (parsed == null)
                 throw new Exception("null");
 
-            //не может же выдать нулл
-            var parsedTokenValue = JsonConvert.DeserializeObject<AccessTokenValue>(parsed.data.streamPlaybackAccessToken.value)!;
+            AccessTokenValue? parsedTokenValue =
+                JsonSerializer.Deserialize<AccessTokenValue>(parsed.Data.StreamPlaybackAccessToken.Value);
 
-            return new AccessToken(parsed.data.streamPlaybackAccessToken.value, parsedTokenValue, parsed.data.streamPlaybackAccessToken.signature);
+            if (parsedTokenValue == null)
+                throw new Exception("null 2");
+
+            return new AccessToken(parsed.Data.StreamPlaybackAccessToken.Value, parsedTokenValue,
+                parsed.Data.StreamPlaybackAccessToken.Signature);
         }
         catch (Exception e)
         {
@@ -87,17 +75,16 @@ public static class GqlNet
 
     /// <exception cref="BadCodeException">Если хттп код не саксес.</exception>
     /// <exception cref="Exception">Скорее всего, не удалось совершить запрос.</exception>
-    private static async Task<string> RequestGql(HttpClient client, string query, object variables, string clientId, string deviceId, string oauth, CancellationToken cancellationToken)
+    private static async Task<string> RequestGql(HttpClient client, string query, object variables, string clientId,
+        string deviceId, string oauth, CancellationToken cancellationToken)
     {
-        var requestBodyObj = new
+        string requestBody = JsonSerializer.Serialize(new
         {
 #pragma warning disable IDE0037
             query = query,
             variables = variables,
 #pragma warning restore IDE0037
-        };
-
-        var requestBody = JsonConvert.SerializeObject(requestBodyObj);
+        });
 
         string? responseContent;
         using (var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://gql.twitch.tv/gql"))
@@ -105,7 +92,8 @@ public static class GqlNet
             requestMessage.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
             FormGqlRequestHeaders(requestMessage.Headers, clientId, deviceId, oauth);
 
-            using var response = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, cancellationToken);
+            using var response = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead,
+                cancellationToken);
             responseContent = await response.Content.ReadAsStringAsync(CancellationToken.None);
 
             if (response.StatusCode != HttpStatusCode.OK)
@@ -117,7 +105,8 @@ public static class GqlNet
         return responseContent;
     }
 
-    private static void FormGqlRequestHeaders(System.Net.Http.Headers.HttpRequestHeaders headers, string clientId, string deviceId, string oauth)
+    private static void FormGqlRequestHeaders(System.Net.Http.Headers.HttpRequestHeaders headers, string clientId,
+        string deviceId, string oauth)
     {
         headers.Add("Accept-Language", "en-US");
         headers.Add("Authorization", oauth);

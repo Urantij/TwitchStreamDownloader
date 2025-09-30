@@ -1,12 +1,12 @@
 using System.Collections.Specialized;
-using System.Text;
 using System.Web;
 
 namespace TwitchStreamDownloader.Net;
 
 public static class UsherNet
 {
-    internal static Uri CreateUsherUri(string channel, string sig, string token, bool fastBread, string playSessionId, Random random)
+    internal static Uri CreateUsherUri(string channel, string sig, string token, bool fastBread, string playSessionId,
+        Random random)
     {
         NameValueCollection nameValue = HttpUtility.ParseQueryString("");
         nameValue["allow_source"] = true.ToString();

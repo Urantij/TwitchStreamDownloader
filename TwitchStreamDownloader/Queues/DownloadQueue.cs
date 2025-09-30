@@ -1,4 +1,3 @@
-using TwitchStreamDownloader.Download;
 using TwitchStreamDownloader.Exceptions;
 using TwitchStreamDownloader.Resources;
 
@@ -42,7 +41,7 @@ public class DownloadQueue : IDisposable
         {
             using var downloadCts = new CancellationTokenSource(downloadTimeout);
 
-            await DownloadVideoAsync(httpClient, queueItem.segment.Uri, queueItem.bufferWriteStream, downloadCts.Token);
+            await DownloadVideoAsync(httpClient, queueItem.Segment.Uri, queueItem.BufferWriteStream, downloadCts.Token);
 
             queueItem.SetWritten();
         }
@@ -97,10 +96,12 @@ public class DownloadQueue : IDisposable
 
     /// <exception cref="TaskCanceledException">Токен отменился.</exception>
     /// <exception cref="Exception">Куча всего.</exception>
-    async Task DownloadVideoAsync(HttpClient httpClient, Uri uri, Stream writeStream, CancellationToken timeoutCancellationToken)
+    async Task DownloadVideoAsync(HttpClient httpClient, Uri uri, Stream writeStream,
+        CancellationToken timeoutCancellationToken)
     {
         using var requestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
-        using var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead, timeoutCancellationToken);
+        using var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseContentRead,
+            timeoutCancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -124,8 +125,9 @@ public class DownloadQueue : IDisposable
             //если остались непонятные ливы, их непонятные ресы нужно задиспоузить, мало ли
             foreach (var q in queue)
             {
-                q.bufferWriteStream.Dispose();
+                q.BufferWriteStream.Dispose();
             }
+
             queue.Clear();
         }
 

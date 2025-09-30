@@ -1,4 +1,3 @@
-using System.Net;
 using ExtM3UPlaylistParser.Models;
 
 namespace TwitchStreamDownloader.Download;
@@ -9,6 +8,7 @@ public class SegmentsDownloaderSettings
     //Если есть фпс, но нет качествао, то па е бать ыхых
     //TODO если нулл, должен брать сурс, но скорее всего будет брать срань
     public Resolution? PreferredResolution { get; set; } = null;
+
     /// <summary>
     /// 60
     /// 30
@@ -24,10 +24,12 @@ public class SegmentsDownloaderSettings
     /// 10 sec default
     /// </summary>
     public TimeSpan MasterPlaylistRetryDelay { get; set; } = TimeSpan.FromSeconds(10);
+
     /// <summary>
     /// 1 sec default
     /// </summary>
     public TimeSpan MinMediaPlaylistUpdateDelay { get; set; } = TimeSpan.FromSeconds(1);
+
     /// <summary>
     /// 3 sec default
     /// </summary>

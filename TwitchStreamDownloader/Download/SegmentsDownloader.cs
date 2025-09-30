@@ -1,4 +1,3 @@
-using System;
 using System.Net;
 using ExtM3UPlaylistParser.Models;
 using ExtM3UPlaylistParser.Parsers;
@@ -269,7 +268,7 @@ public class SegmentsDownloader : IDisposable
                 return;
         }
 
-        var usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.FastBread, SessionId,
+        var usherUri = UsherNet.CreateUsherUri(channel, Access.Signature, Access.Value, settings.FastBread, SessionId,
             random);
 
         _ = Task.Run(() => MasterLoopAsync(usherUri, cancellationToken), cancellationToken);
@@ -326,9 +325,8 @@ public class SegmentsDownloader : IDisposable
 
                 MasterPlaylist playlist = parser.Parse(responseContent);
 
-                var twitchInfoTagInfo = playlist.GlobalTags.First(
-                    t => string.Equals(t.Tag, "#EXT-X-TWITCH-INFO",
-                        StringComparison.Ordinal) /*t.tag == "#EXT-X-TWITCH-INFO"*/);
+                var twitchInfoTagInfo = playlist.GlobalTags.First(t => string.Equals(t.Tag, "#EXT-X-TWITCH-INFO",
+                    StringComparison.Ordinal) /*t.tag == "#EXT-X-TWITCH-INFO"*/);
                 var twitchInfoTag = new XTwitchInfoTag(twitchInfoTagInfo.Value!);
 
                 LastMasterPlaylistPrint = new MasterPlaylistPrint(DateTime.UtcNow, twitchInfoTag.StreamTime);
@@ -374,7 +372,7 @@ public class SegmentsDownloader : IDisposable
             {
                 return;
             }
-            catch (BadCodeException e) when (e.statusCode == HttpStatusCode.Forbidden &&
+            catch (BadCodeException e) when (e.StatusCode == HttpStatusCode.Forbidden &&
                                              settings.AutomaticallyUpdateAccessToken)
             {
                 OnMasterPlaylistException(e);
@@ -383,7 +381,7 @@ public class SegmentsDownloader : IDisposable
                 if (Access == null)
                     return;
 
-                usherUri = UsherNet.CreateUsherUri(channel, Access.signature, Access.value, settings.FastBread,
+                usherUri = UsherNet.CreateUsherUri(channel, Access.Signature, Access.Value, settings.FastBread,
                     SessionId, random);
             }
             catch (Exception e)

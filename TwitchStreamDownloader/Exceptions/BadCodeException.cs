@@ -7,13 +7,13 @@ namespace TwitchStreamDownloader.Exceptions;
 /// </summary>
 public class BadCodeException : Exception
 {
-    public readonly HttpStatusCode statusCode;
-    public readonly string responseContent;
+    public HttpStatusCode StatusCode { get; }
+    public string ResponseContent { get; }
 
-    public BadCodeException(HttpStatusCode statusCode, string responseContent) 
+    public BadCodeException(HttpStatusCode statusCode, string responseContent)
         : base($"Bad Code ({statusCode})")
     {
-        this.statusCode = statusCode;
-        this.responseContent = responseContent;
+        this.StatusCode = statusCode;
+        this.ResponseContent = responseContent;
     }
 }
