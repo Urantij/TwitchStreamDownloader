@@ -5,17 +5,19 @@ namespace TwitchStreamDownloader;
 
 public class StreamDownloaderBuilder
 {
-    readonly string channel;
+    private readonly string channel;
 
-    SegmentsDownloaderSettings? settings;
+    private SegmentsDownloaderSettings? settings;
 
-    string? clientId;
-    string? oauth;
+    private string? clientId;
+    private string? oauth;
 
-    TimeSpan? downloadTimeout;
+    private TimeSpan? downloadTimeout;
 
-    ILogger? logger;
-    HttpClient? httpClient;
+    private ILogger? logger;
+    private HttpClient? httpClient;
+
+    private Action<StreamSelection>? action;
 
     public StreamDownloaderBuilder(string channel)
     {
@@ -62,6 +64,13 @@ public class StreamDownloaderBuilder
         return this;
     }
 
+    public StreamDownloaderBuilder WithStreamSelectionOverride(Action<StreamSelection> action)
+    {
+        this.action = action;
+
+        return this;
+    }
+
     public StreamDownloader Build()
     {
         settings ??= new SegmentsDownloaderSettings();
@@ -74,6 +83,7 @@ public class StreamDownloaderBuilder
             UseProxy = false
         });
 
-        return new StreamDownloader(channel, settings, clientId, oauth, downloadTimeout.Value, httpClient, logger);
+        return new StreamDownloader(channel, settings, clientId, oauth, downloadTimeout.Value, httpClient, logger,
+            action);
     }
 }

@@ -30,12 +30,14 @@ public class StreamDownloader
     public bool Working { get; private set; }
 
     public StreamDownloader(string channel, SegmentsDownloaderSettings segmentsDownloaderSettings, string? clientId,
-        string? oauth, TimeSpan downloadQueueTimeout, HttpClient httpClient, ILogger? logger)
+        string? oauth, TimeSpan downloadQueueTimeout, HttpClient httpClient, ILogger? logger,
+        Action<StreamSelection>? selectionOverride)
     {
         this.logger = logger;
         this.httpClient = httpClient;
 
-        SegmentsDownloader = new SegmentsDownloader(httpClient, segmentsDownloaderSettings, channel, clientId, oauth);
+        SegmentsDownloader = new SegmentsDownloader(httpClient, segmentsDownloaderSettings, channel, clientId, oauth,
+            selectionOverride);
         SegmentsDownloader.TokenAcquired += TokenAcquired;
         SegmentsDownloader.SegmentArrived += SegmentArrived;
 

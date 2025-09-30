@@ -92,6 +92,8 @@ public class SegmentsDownloader : IDisposable
     private string? clientId;
     private string? oauth;
 
+    public Action<StreamSelection>? StreamSelectionHappening;
+
     public event EventHandler? PlaylistEnded;
     public event EventHandler<Exception>? MasterPlaylistExceptionOccured;
     public event EventHandler<Exception>? MediaPlaylistExceptionOccured;
@@ -129,12 +131,13 @@ public class SegmentsDownloader : IDisposable
     /// <param name="clientId"></param>
     /// <param name="oauth"></param>
     public SegmentsDownloader(HttpClient httpClient, SegmentsDownloaderSettings settings, string channel,
-        string? clientId, string? oauth)
+        string? clientId, string? oauth, Action<StreamSelection>? streamSelectionHappening)
     {
         this.settings = settings;
         this.channel = channel;
         this.clientId = clientId;
         this.oauth = oauth;
+        StreamSelectionHappening = streamSelectionHappening;
 
         this.httpClient = httpClient;
 
@@ -346,7 +349,7 @@ public class SegmentsDownloader : IDisposable
 
                     try
                     {
-                        await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
+                        await Task.Delay(settings.MasterPlaylistRetryDelay, cancellationToken);
                     }
                     catch
                     {
@@ -435,11 +438,25 @@ public class SegmentsDownloader : IDisposable
                 var videos = masterPlaylist.VariantStreams
                     .Select(s => $"{s.StreamInfTag.Resolution} {s.StreamInfTag.FrameRate}").ToArray();
 
-                throw new NoQualityException(videos);
+                if (StreamSelectionHappening == null)
+                    throw new NoQualityException(videos);
             }
         }
 
-        variantStream ??= masterPlaylist.VariantStreams.First();
+        StreamSelection selection = new(variantStream, masterPlaylist.VariantStreams, LastStreamQuality);
+        selection.ResetPlaylist = variantStream == null && settings.TakeOnlyPreferredQuality;
+
+        StreamSelectionHappening?.Invoke(selection);
+
+        if (selection.SelectionOverride != null)
+            variantStream = selection.SelectionOverride;
+        else if (selection.ResetPlaylist)
+            throw new NoQualityException(masterPlaylist.VariantStreams
+                .Select(s => $"{s.StreamInfTag.Resolution} {s.StreamInfTag.FrameRate}").ToArray());
+
+        // раньше в начале списка всегда было самое высокое. сейчас нет.
+        variantStream ??= masterPlaylist.VariantStreams.OrderByDescending(vs => vs.StreamInfTag.Resolution?.Height)
+            .First();
 
         // Ну они вроде всегда есть.
         var quality = new Quality(variantStream.StreamInfTag.Resolution, variantStream.StreamInfTag.FrameRate!.Value);
