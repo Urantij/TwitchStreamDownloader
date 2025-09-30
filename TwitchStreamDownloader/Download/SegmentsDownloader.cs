@@ -419,6 +419,9 @@ public class SegmentsDownloader : IDisposable
         if (variantStream == null && settings.PreferredResolution != null)
         {
             VariantStream[] qualityStreams = masterPlaylist.VariantStreams
+                // "немного" каловая проверка, ну ладно
+                .Where(s => settings.MinPToDownload == null ||
+                            s.StreamInfTag.Resolution?.Height >= settings.MinPToDownload)
                 .Where(s => settings.PreferredResolution.Same(s.StreamInfTag.Resolution))
                 .ToArray();
 
@@ -455,8 +458,19 @@ public class SegmentsDownloader : IDisposable
                 .Select(s => $"{s.StreamInfTag.Resolution} {s.StreamInfTag.FrameRate}").ToArray());
 
         // раньше в начале списка всегда было самое высокое. сейчас нет.
-        variantStream ??= masterPlaylist.VariantStreams.OrderByDescending(vs => vs.StreamInfTag.Resolution?.Height)
-            .First();
+        if (variantStream == null)
+        {
+            variantStream = masterPlaylist.VariantStreams.OrderByDescending(vs => vs.StreamInfTag.Resolution?.Height)
+                .First();
+
+            if (settings.MinPToDownload != null && (variantStream.StreamInfTag.Resolution?.Height == null ||
+                                                    variantStream.StreamInfTag.Resolution.Height <
+                                                    settings.MinPToDownload))
+            {
+                throw new NoQualityException(masterPlaylist.VariantStreams
+                    .Select(s => $"{s.StreamInfTag.Resolution} {s.StreamInfTag.FrameRate}").ToArray());
+            }
+        }
 
         // Ну они вроде всегда есть.
         var quality = new Quality(variantStream.StreamInfTag.Resolution, variantStream.StreamInfTag.FrameRate!.Value);

@@ -27,6 +27,12 @@ public class SegmentsDownloaderSettings
     public bool TakeOnlyPreferredQuality { get; set; } = true;
 
     /// <summary>
+    /// Если p видоса ниже значения, не будет рассматривать при автовыборе.
+    /// Ну типа 720, 1080...
+    /// </summary>
+    public int? MinPToDownload { get; set; } = null;
+
+    /// <summary>
     /// 10 sec default
     /// </summary>
     public TimeSpan MasterPlaylistRetryDelay { get; set; } = TimeSpan.FromSeconds(10);
