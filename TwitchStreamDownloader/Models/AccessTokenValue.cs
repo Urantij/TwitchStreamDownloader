@@ -20,7 +20,7 @@ public class AccessTokenValue
     }
 
     public AccessTokenValue(bool? adblock, AuthorizationData? authorization, bool? blackoutEnabled, string? channel,
-        string? channelId, string? geoblockReason, string? deviceId, long? expires, bool? extendedHistoryAllowed,
+        ulong? channelId, string? geoblockReason, string? deviceId, long? expires, bool? extendedHistoryAllowed,
         bool? hideAds, bool? httpsRequired, bool? mature, bool? partner, string? platform,
         string? playerType, PrivateData? @private, bool? privileged, string? role, bool? serverAds, bool? showAds,
         bool? subscriber, bool? turbo, ulong? userId, string? userIp, int? version)
@@ -64,7 +64,7 @@ public class AccessTokenValue
 
     [JsonPropertyName("channel")] public string? Channel { get; }
 
-    [JsonPropertyName("channel_id")] public string? ChannelId { get; }
+    [JsonPropertyName("channel_id")] public ulong? ChannelId { get; }
 
     //впадлу
     //chansub
